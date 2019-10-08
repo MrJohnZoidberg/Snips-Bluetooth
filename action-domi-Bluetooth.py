@@ -80,7 +80,7 @@ def on_message_devices_say(client, userdata, msg):
     if len(devices) > 1:
         say(session_id, "Die Geräte {devices} .".format(devices=part))
     elif len(devices) == 1:
-        say(session_id, "Das Gerät {devices} .")
+        say(session_id, "Das Gerät {devices} .".format(devices=part))
     else:
         say(session_id, "Kein Gerät.")
 
