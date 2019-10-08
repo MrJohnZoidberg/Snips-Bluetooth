@@ -1,4 +1,3 @@
 paho-mqtt
-wheel
 pybluez
 toml

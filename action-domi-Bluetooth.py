@@ -1,7 +1,7 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import bluetooth  # install bluez-development
+import bluetooth  # install libbluetooth-dev
 import paho.mqtt.client as mqtt
 import json
 import toml
