@@ -46,7 +46,7 @@ def on_message_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
-    bluetooth_cls.scan_thread = threading.Thread(target=bluetooth_cls.scan_devices)\
+    bluetooth_cls.scan_thread = threading.Thread(target=bluetooth_cls.scan_devices)
     bluetooth_cls.scan_thread.start()
 
     say(session_id, "Die Bluetooth Suche wurde gestartet.")
