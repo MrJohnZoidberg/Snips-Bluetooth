@@ -5,6 +5,7 @@ import bluetooth  # install libbluetooth-dev
 import paho.mqtt.client as mqtt
 import json
 import toml
+import threading
 
 
 USERNAME_INTENTS = "domi"
@@ -15,6 +16,19 @@ MQTT_PASSWORD = None
 
 def add_prefix(intent_name):
     return USERNAME_INTENTS + ":" + intent_name
+
+
+class Bluetooth:
+    def __init__(self):
+        self.nearby_devices = None
+
+    def scan_devices(self):
+        self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
+
+        #for addr, name in nearby_devices:
+        #   print("  %s - %s" % (addr, name))
+        #return "found %d devices" % len(nearby_devices)
+        mqtt_client.publish('bluetooth/scan')
 
 
 def get_slots(data):
@@ -36,13 +50,13 @@ def on_message_scan(client, userdata, msg):
     session_id = data['sessionId']
     intent_id = data['intent']['intentName']
 
+    thread = threading.Thread(target=bluetooth_cls.scan_devices)
+    thread.start()
     say(session_id, "Bluetooth Suche wurde gestartet.")
 
-    nearby_devices = bluetooth.discover_devices(lookup_names=True)
-    print("found %d devices" % len(nearby_devices))
 
-    for addr, name in nearby_devices:
-        print("  %s - %s" % (addr, name))
+def on_message_scan_finished(client, userdata, msg):
+    notify("Bluetooth Suche wurde beendet.")
 
 
 def say(session_id, text):
@@ -52,6 +66,11 @@ def say(session_id, text):
 
 def end_session(session_id):
     mqtt_client.publish('hermes/dialogueManager/endSession', json.dumps({'sessionId': session_id}))
+
+
+def notify(text):
+    mqtt_client.publish('hermes/dialogueManager/startSession', json.dumps({'init': {'type': 'notification',
+                                                                                    'text': text}}))
 
 
 def dialogue(session_id, text, intent_filter, custom_data=None):
@@ -72,9 +91,12 @@ if __name__ == "__main__":
     if 'mqtt_password' in snips_config['snips-common'].keys():
         MQTT_PASSWORD = snips_config['snips-common']['mqtt_password']
 
+    bluetooth_cls = Bluetooth()
     mqtt_client = mqtt.Client()
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), on_message_scan)
+    mqtt_client.message_callback_add('bluetooth/scan', on_message_scan_finished)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
+    mqtt_client.subscribe('bluetooth/scan')
     mqtt_client.loop_forever()
