@@ -21,14 +21,11 @@ def add_prefix(intent_name):
 class Bluetooth:
     def __init__(self):
         self.nearby_devices = None
+        self.scan_thread = None
 
     def scan_devices(self):
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
-
-        #for addr, name in nearby_devices:
-        #   print("  %s - %s" % (addr, name))
-        #return "found %d devices" % len(nearby_devices)
-        mqtt_client.publish('bluetooth/scan')
+        mqtt_client.publish('bluetooth/scan_finished')
 
 
 def get_slots(data):
@@ -48,15 +45,24 @@ def get_slots(data):
 def on_message_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
-    intent_id = data['intent']['intentName']
 
-    thread = threading.Thread(target=bluetooth_cls.scan_devices)
-    thread.start()
-    say(session_id, "Bluetooth Suche wurde gestartet.")
+    bluetooth_cls.scan_thread = threading.Thread(target=bluetooth_cls.scan_devices)\
+    bluetooth_cls.scan_thread.start()
+
+    say(session_id, "Die Bluetooth Suche wurde gestartet.")
 
 
 def on_message_scan_finished(client, userdata, msg):
-    notify("Bluetooth Suche wurde beendet.")
+    if bluetooth_cls.scan_thread:
+        del bluetooth_cls.scan_thread
+    sentence = "Die Bluetooth Suche wurde beendet."
+    if len(bluetooth_cls.nearby_devices) > 1:
+        sentence += " Ich habe {num} Geräte gefunden."
+    elif len(bluetooth_cls.nearby_devices) == 1:
+        sentence += " Ich habe ein Gerät gefunden."
+    else:
+        sentence += " Ich habe kein Gerät gefunden."
+    notify(sentence)
 
 
 def say(session_id, text):
@@ -94,9 +100,9 @@ if __name__ == "__main__":
     bluetooth_cls = Bluetooth()
     mqtt_client = mqtt.Client()
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), on_message_scan)
-    mqtt_client.message_callback_add('bluetooth/scan', on_message_scan_finished)
+    mqtt_client.message_callback_add('bluetooth/scan_finished', on_message_scan_finished)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
-    mqtt_client.subscribe('bluetooth/scan')
+    mqtt_client.subscribe('bluetooth/scan_finished')
     mqtt_client.loop_forever()
