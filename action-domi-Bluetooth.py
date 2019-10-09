@@ -27,7 +27,7 @@ class Bluetooth:
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
         device_names = [name for addr, name in self.nearby_devices]
         if device_names:
-            inject('bluetooth_devices', device_names, "add_devices")
+            inject('bluetooth_devices', device_names)
         else:
             notify("Ich habe kein Gerät gefunden.")
 
