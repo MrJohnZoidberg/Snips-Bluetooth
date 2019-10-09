@@ -34,7 +34,6 @@ class Bluetoothctl:
         try:
             self.send("scan on")
         except Exception as e:
-            print(e)
             logger.error(e)
 
     def make_discoverable(self):
@@ -67,9 +66,7 @@ class Bluetoothctl:
         available_devices = []
         try:
             out = self.get_output("devices")
-            print(out)
         except Exception as e:
-            print(e)
             logger.error(e)
         else:
             for line in out:

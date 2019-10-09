@@ -102,6 +102,22 @@ def on_message_devices_say(client, userdata, msg):
         say(session_id, "Kein Gerät.")
 
 
+def on_message_device_connect(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    session_id = data['sessionId']
+
+    name = data['device_name']
+    if name in bluetooth_cls.synonyms.values():
+        name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
+    addr = [device['mac_address'] for device in bluetooth_cls.available_devices if name == device['name']][0]
+    bluetooth_cls.ctl.connect(addr)
+    say(session_id, "Verbunden mit {name} .".format(name=data['device_name']))
+
+
+def on_message_device_disconnect(client, userdata, msg):
+    pass
+
+
 def on_message_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
 
@@ -159,10 +175,16 @@ if __name__ == "__main__":
     mqtt_client = mqtt.Client()
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), on_message_scan)
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesSay'), on_message_devices_say)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'),
+                                     on_message_device_connect)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'),
+                                     on_message_device_disconnect)
     mqtt_client.message_callback_add('hermes/injection/complete', on_message_injection_complete)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesSay'))
+    mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceConnect'))
+    mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'))
     mqtt_client.subscribe('hermes/injection/complete')
     mqtt_client.loop_forever()
