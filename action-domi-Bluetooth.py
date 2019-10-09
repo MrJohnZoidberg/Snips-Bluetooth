@@ -46,7 +46,7 @@ class Bluetooth:
     def thread_scan(self):
         self.ctl.start_scan()
         for i in range(30):
-            if len(self.ctl.get_available_devices()) > self.available_devices:
+            if len(self.ctl.get_available_devices()) > len(self.available_devices):
                 notify("Neues Gerät entdeckt.")
             self.available_devices = self.ctl.get_available_devices()
             time.sleep(1)
