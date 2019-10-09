@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import bluetooth  # install libbluetooth-dev
 import paho.mqtt.client as mqtt
 import json
 import toml
 import threading
 import configparser
-import subprocess
+import bluetoothctl
+import time
 
 
 USERNAME_INTENTS = "domi"
@@ -33,23 +33,25 @@ def read_configuration_file(configuration_file):
 
 class Bluetooth:
     def __init__(self):
-        self.nearby_devices = list()
+        self.available_devices = list()
         self.scan_thread = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split('::')[0]: synonym.split('::')[1] for synonym in synonym_list}
-        self.process = subprocess.Popen(['bluetoothctl'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.socket = bluetooth.BluetoothSocket()
+        self.ctl = bluetoothctl.Bluetoothctl()
 
     def scan_devices(self):
-        self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
-        device_names = [name for addr, name in self.nearby_devices]
-        if device_names:
+        self.scan_thread = threading.Thread(target=self.thread_scan)
+        self.scan_thread.start()
+
+    def thread_scan(self):
+        self.ctl.start_scan()
+        time.sleep(10)
+        self.available_devices = self.ctl.get_available_devices()
+        if self.available_devices:
+            device_names = [device['name'] for device in self.available_devices]
             inject('bluetooth_devices', device_names, "add_devices")
         else:
             notify("Ich habe kein Gerät gefunden.")
-
-    def connect_device(self, addr):
-        self.socket.connect((addr, 1))
 
 
 def get_slots(data):
@@ -70,9 +72,7 @@ def on_message_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
-    bluetooth_cls.scan_thread = threading.Thread(target=bluetooth_cls.scan_devices)
-    bluetooth_cls.scan_thread.start()
-
+    bluetooth_cls.scan_devices()
     say(session_id, "Die Bluetooth Suche wurde gestartet.")
 
 
@@ -80,21 +80,20 @@ def on_message_devices_say(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
-    devices = bluetooth_cls.nearby_devices
+    devices = bluetooth_cls.available_devices
 
     part = ""
-    for addr, name in devices:
-        if name in bluetooth_cls.synonyms:
-            part += bluetooth_cls.synonyms[name]
+    for device in devices:
+        if device['name'] in bluetooth_cls.synonyms:
+            part += bluetooth_cls.synonyms[device['name']]
         else:
-            part += name
-        if name != devices[-1][1]:
+            part += device['name']
+        if device != devices[-1]:
             part += ", "
 
     if len(devices) > 1:
         say(session_id, "Die Geräte {devices} .".format(devices=part))
     elif len(devices) == 1:
-        bluetooth_cls.connect_device(devices[0][0])
         say(session_id, "Das Gerät {devices} .".format(devices=part))
     else:
         say(session_id, "Kein Gerät.")
@@ -106,8 +105,8 @@ def on_message_injection_complete(client, userdata, msg):
     if data['requestId'] == "add_devices":
         if bluetooth_cls.scan_thread:
             del bluetooth_cls.scan_thread
-        if len(bluetooth_cls.nearby_devices) > 1:
-            notify("Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.nearby_devices)))
+        if len(bluetooth_cls.available_devices) > 1:
+            notify("Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.available_devices)))
         else:
             notify("Ich habe ein Gerät gefunden.")
 
