@@ -36,6 +36,7 @@ class Bluetooth:
         self.scan_thread = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split('::')[0]: synonym.split('::')[1] for synonym in synonym_list}
+        self.socket = bluetooth.BluetoothSocket()
 
     def scan_devices(self):
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
@@ -44,6 +45,9 @@ class Bluetooth:
             inject('bluetooth_devices', device_names, "add_devices")
         else:
             notify("Ich habe kein Gerät gefunden.")
+
+    def connect_device(self, addr):
+        self.socket.connect(addr)
 
 
 def get_slots(data):
@@ -88,6 +92,7 @@ def on_message_devices_say(client, userdata, msg):
     if len(devices) > 1:
         say(session_id, "Die Geräte {devices} .".format(devices=part))
     elif len(devices) == 1:
+        bluetooth_cls.connect_device(devices[0][0])
         say(session_id, "Das Gerät {devices} .".format(devices=part))
     else:
         say(session_id, "Kein Gerät.")
