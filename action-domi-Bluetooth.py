@@ -26,7 +26,10 @@ class Bluetooth:
     def scan_devices(self):
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
         device_names = [name for addr, name in self.nearby_devices]
-        inject('bluetooth_devices', device_names, "add_devices")
+        if device_names:
+            inject('bluetooth_devices', device_names, "add_devices")
+        else:
+            notify("Ich habe kein Gerät gefunden.")
 
 
 def get_slots(data):
@@ -74,20 +77,12 @@ def on_message_devices_say(client, userdata, msg):
 
 
 def on_message_injection_complete(client, userdata, msg):
-    data = json.loads(msg.payload.decode("utf-8"))
-    request_id = data['requestId']
-
-    if request_id == "add_devices":
-        if bluetooth_cls.scan_thread:
-            del bluetooth_cls.scan_thread
-        sentence = "Die Bluetooth Suche wurde beendet."
-        if len(bluetooth_cls.nearby_devices) > 1:
-            sentence += " Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.nearby_devices))
-        elif len(bluetooth_cls.nearby_devices) == 1:
-            sentence += " Ich habe ein Gerät gefunden."
-        else:
-            sentence += " Ich habe kein Gerät gefunden."
-        notify(sentence)
+    if bluetooth_cls.scan_thread:
+        del bluetooth_cls.scan_thread
+    if len(bluetooth_cls.nearby_devices) > 1:
+        notify("Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.nearby_devices)))
+    else:
+        notify("Ich habe ein Gerät gefunden.")
 
 
 def say(session_id, text):
@@ -104,10 +99,10 @@ def notify(text):
                                                                                     'text': text}}))
 
 
-def inject(entity_name, values, request_id, operation_kind='addFromVanilla'):
+def inject(entity_name, values, operation_kind='addFromVanilla'):
     operation_data = {entity_name: values}
     operation = (operation_kind, operation_data)
-    mqtt_client.publish('hermes/injection/perform', json.dumps({'id': request_id, 'operations': [operation]}))
+    mqtt_client.publish('hermes/injection/perform', json.dumps({'operations': [operation]}))
 
 
 def dialogue(session_id, text, intent_filter, custom_data=None):
