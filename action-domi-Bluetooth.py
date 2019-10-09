@@ -45,8 +45,11 @@ class Bluetooth:
 
     def thread_scan(self):
         self.ctl.start_scan()
-        time.sleep(30)
-        self.available_devices = self.ctl.get_available_devices()
+        for i in range(30):
+            if len(self.ctl.get_available_devices()) > self.available_devices:
+                notify("Neues Gerät entdeckt.")
+            self.available_devices = self.ctl.get_available_devices()
+            time.sleep(1)
         if self.available_devices:
             device_names = [device['name'] for device in self.available_devices]
             inject('bluetooth_devices', device_names, "add_devices")
