@@ -7,6 +7,7 @@ import json
 import toml
 import threading
 import configparser
+import subprocess
 
 
 USERNAME_INTENTS = "domi"
@@ -36,6 +37,8 @@ class Bluetooth:
         self.scan_thread = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split('::')[0]: synonym.split('::')[1] for synonym in synonym_list}
+        self.process = subprocess.Popen(['bluetoothctl'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.socket = bluetooth.BluetoothSocket()
 
     def scan_devices(self):
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
@@ -46,8 +49,7 @@ class Bluetooth:
             notify("Ich habe kein Gerät gefunden.")
 
     def connect_device(self, addr):
-        self.socket = bluetooth.BluetoothSocket()
-        self.socket.connect(addr)
+        self.socket.connect((addr, 1))
 
 
 def get_slots(data):
