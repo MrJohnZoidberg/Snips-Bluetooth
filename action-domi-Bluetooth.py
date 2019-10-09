@@ -45,7 +45,7 @@ class Bluetooth:
 
     def thread_scan(self):
         self.ctl.start_scan()
-        time.sleep(10)
+        time.sleep(30)
         self.available_devices = self.ctl.get_available_devices()
         if self.available_devices:
             device_names = [device['name'] for device in self.available_devices]

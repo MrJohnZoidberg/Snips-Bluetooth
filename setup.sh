@@ -28,7 +28,6 @@ then
 
     # Activate the virtual environment and install requirements.
     . $VENV/bin/activate
-    pip3 install wheel
     pip3 install -r requirements.txt
 
 else
