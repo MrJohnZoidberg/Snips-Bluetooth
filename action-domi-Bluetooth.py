@@ -20,7 +20,7 @@ def add_prefix(intent_name):
 
 class Bluetooth:
     def __init__(self):
-        self.nearby_devices = None
+        self.nearby_devices = list()
         self.scan_thread = None
 
     def scan_devices(self):
