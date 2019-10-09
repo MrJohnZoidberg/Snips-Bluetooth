@@ -128,7 +128,7 @@ def on_message_device_connect(client, userdata, msg):
         name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
     addr = [device['mac_address'] for device in bluetooth_cls.available_devices if name == device['name']][0]
     bluetooth_cls.ctl.connect(addr)
-    say(session_id, "Verbunden mit {name} .".format(name=data['device_name']))
+    say(session_id, "Verbunden mit {name} .".format(name=slots['device_name']))
 
 
 def on_message_device_disconnect(client, userdata, msg):
