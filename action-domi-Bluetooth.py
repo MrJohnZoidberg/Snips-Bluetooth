@@ -47,7 +47,23 @@ class Bluetooth:
         self.ctl.start_scan()
         for i in range(30):
             if len(self.ctl.get_available_devices()) > len(self.available_devices):
-                notify("Neues Gerät entdeckt.")
+                new_devices = [device for device in self.ctl.get_available_devices()
+                               if device not in self.available_devices]
+                names = []
+                for device in new_devices:
+                    if device['name'] in self.synonyms:
+                        names.append(self.synonyms[device['name']])
+                    else:
+                        names.append(device['name'])
+                if len(new_devices) == 1:
+                    notify("Gerät {name} entdeckt.".format(name=names[0]))
+                else:
+                    part = ""
+                    for name in names:
+                        part += name
+                        if name != names[-1]:
+                            part += ", "
+                    notify("Geräte {names} entdeckt.".format(names=part))
             self.available_devices = self.ctl.get_available_devices()
             time.sleep(1)
         if self.available_devices:
@@ -104,9 +120,10 @@ def on_message_devices_say(client, userdata, msg):
 
 def on_message_device_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
+    slots = get_slots(data)
     session_id = data['sessionId']
 
-    name = data['device_name']
+    name = slots['device_name']
     if name in bluetooth_cls.synonyms.values():
         name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
     addr = [device['mac_address'] for device in bluetooth_cls.available_devices if name == device['name']][0]
