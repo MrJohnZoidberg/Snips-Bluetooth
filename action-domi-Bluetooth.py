@@ -34,7 +34,7 @@ class Bluetooth:
     def __init__(self):
         self.nearby_devices = list()
         self.scan_thread = None
-        synonym_list = config['secret']['device_synonyms'].split(',')
+        synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split('::')[0]: synonym.split('::')[1] for synonym in synonym_list}
 
     def scan_devices(self):
