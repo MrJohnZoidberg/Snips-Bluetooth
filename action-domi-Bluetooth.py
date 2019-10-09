@@ -25,7 +25,8 @@ class Bluetooth:
 
     def scan_devices(self):
         self.nearby_devices = bluetooth.discover_devices(lookup_names=True)
-        mqtt_client.publish('bluetooth/scan_finished')
+        device_names = [name for addr, name in self.nearby_devices]
+        inject('bluetooth_devices', device_names, "add_devices")
 
 
 def get_slots(data):
@@ -52,19 +53,6 @@ def on_message_scan(client, userdata, msg):
     say(session_id, "Die Bluetooth Suche wurde gestartet.")
 
 
-def on_message_scan_finished(client, userdata, msg):
-    if bluetooth_cls.scan_thread:
-        del bluetooth_cls.scan_thread
-    sentence = "Die Bluetooth Suche wurde beendet."
-    if len(bluetooth_cls.nearby_devices) > 1:
-        sentence += " Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.nearby_devices))
-    elif len(bluetooth_cls.nearby_devices) == 1:
-        sentence += " Ich habe ein Gerät gefunden."
-    else:
-        sentence += " Ich habe kein Gerät gefunden."
-    notify(sentence)
-
-
 def on_message_devices_say(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
@@ -85,6 +73,23 @@ def on_message_devices_say(client, userdata, msg):
         say(session_id, "Kein Gerät.")
 
 
+def on_message_injection_complete(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    request_id = data['requestId']
+
+    if request_id == "add_devices":
+        if bluetooth_cls.scan_thread:
+            del bluetooth_cls.scan_thread
+        sentence = "Die Bluetooth Suche wurde beendet."
+        if len(bluetooth_cls.nearby_devices) > 1:
+            sentence += " Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.nearby_devices))
+        elif len(bluetooth_cls.nearby_devices) == 1:
+            sentence += " Ich habe ein Gerät gefunden."
+        else:
+            sentence += " Ich habe kein Gerät gefunden."
+        notify(sentence)
+
+
 def say(session_id, text):
     mqtt_client.publish('hermes/dialogueManager/endSession', json.dumps({'text': text,
                                                                          'sessionId': session_id}))
@@ -97,6 +102,12 @@ def end_session(session_id):
 def notify(text):
     mqtt_client.publish('hermes/dialogueManager/startSession', json.dumps({'init': {'type': 'notification',
                                                                                     'text': text}}))
+
+
+def inject(entity_name, values, request_id, operation_kind='addFromVanilla'):
+    operation_data = {entity_name: values}
+    operation = (operation_kind, operation_data)
+    mqtt_client.publish('hermes/injection/perform', json.dumps({'id': request_id, 'operations': [operation]}))
 
 
 def dialogue(session_id, text, intent_filter, custom_data=None):
@@ -121,10 +132,10 @@ if __name__ == "__main__":
     mqtt_client = mqtt.Client()
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), on_message_scan)
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesSay'), on_message_devices_say)
-    mqtt_client.message_callback_add('bluetooth/scan_finished', on_message_scan_finished)
+    mqtt_client.message_callback_add('hermes/injection/complete', on_message_injection_complete)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesSay'))
-    mqtt_client.subscribe('bluetooth/scan_finished')
+    mqtt_client.subscribe('hermes/injection/complete')
     mqtt_client.loop_forever()
