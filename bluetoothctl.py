@@ -66,8 +66,10 @@ class Bluetoothctl:
         available_devices = []
         try:
             out = self.get_output("devices")
+            print(out)
         except Exception as e:
             logger.error(e)
+            print(e)
         else:
             for line in out:
                 device = self.parse_device_info(line)
