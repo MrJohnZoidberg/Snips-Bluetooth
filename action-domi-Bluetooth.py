@@ -81,12 +81,18 @@ class Bluetooth:
 
     def thread_connect(self, addr):
         success = self.ctl.connect(addr)
+        if success:
+            notify("Verbunden.")
+        else:
+            notify("Nicht verbunden.")
+        """
         time.sleep(2)
         name = self.get_name_from_addr(addr)
         if success:
             notify("%s ist nun verbunden." % name)
         else:
             notify("%s konnte nicht verbunden werden." % name)
+        """
 
 
 def get_slots(data):
@@ -134,7 +140,7 @@ def msg_connect(client, userdata, msg):
     bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
     bluetooth_cls.threadobj_connect.start()
 
-    say(session_id, "%s wird verbunden." % slots['device_name'])
+    say(session_id)
 
 
 def msg_disconnect(client, userdata, msg):
@@ -167,7 +173,7 @@ def msg_remove(client, userdata, msg):
     say(session_id, "%s wurde entfernt." % slots['device_name'])
 
 
-def say(session_id, text):
+def say(session_id, text=None):
     if text:
         data = {'text': text, 'sessionId': session_id}
     else:
