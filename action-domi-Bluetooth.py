@@ -52,7 +52,8 @@ class Bluetooth:
     def get_addr_from_name(self, name):
         if name in self.synonyms.values():
             name = [real_name for real_name in self.synonyms if self.synonyms[real_name] == name][0]
-        addr = [device['mac_address'] for device in bluetooth_cls.discoverable_devices if name == device['name']][0]
+        addr = [device['mac_address'] for device in bluetooth_cls.ctl.get_available_devices()
+                if name == device['name']][0]
         return addr
 
     def thread_scan(self):
