@@ -44,7 +44,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Discovering: yes", pexpect.EOF, pexpect.TIMEOUT]
+                ["Discovering: yes", pexpect.EOF, pexpect.TIMEOUT], 3
             )
             return res == 0
 
@@ -126,7 +126,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to pair", "Pairing successful", pexpect.EOF]
+                ["Failed to pair", "Pairing successful", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
 
@@ -139,7 +139,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to trust", "Trusted: yes", pexpect.EOF]
+                ["Failed to trust", "Trusted: yes", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
 
@@ -152,7 +152,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to untrust", "untrust succeeded", pexpect.EOF]
+                ["Failed to untrust", "untrust succeeded", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
 
@@ -166,7 +166,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["not available", "Device has been removed", pexpect.EOF]
+                ["not available", "Device has been removed", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
 
@@ -180,7 +180,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to connect", "Connection successful", pexpect.EOF]
+                ["Failed to connect", "Connection successful", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
 
@@ -194,6 +194,6 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to disconnect", "Successful disconnected", pexpect.EOF]
+                ["Failed to disconnect", "Successful disconnected", pexpect.EOF, pexpect.TIMEOUT]
             )
             return res == 1
