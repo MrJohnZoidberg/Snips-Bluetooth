@@ -124,7 +124,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to trust", "Pairing successful", pexpect.EOF]
+                ["Failed to trust", "Trusted: yes", pexpect.EOF]
             )
             return res == 1
 
