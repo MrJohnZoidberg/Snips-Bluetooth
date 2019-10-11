@@ -118,7 +118,8 @@ class Bluetoothctl:
 
     def trust(self, mac_address):
         try:
-            self.send(f"trust {mac_address}", 4)
+            self.process.send(f"trust {mac_address}\n")
+            time.sleep(4)
         except Exception as e:
             logger.error(e)
             return False
@@ -130,7 +131,8 @@ class Bluetoothctl:
 
     def untrust(self, mac_address):
         try:
-            self.send(f"untrust {mac_address}", 4)
+            self.process.send(f"untrust {mac_address}\n")
+            time.sleep(4)
         except Exception as e:
             logger.error(e)
             return False
@@ -143,7 +145,8 @@ class Bluetoothctl:
     def remove(self, mac_address):
         """Remove paired device by mac address, return success of the operation."""
         try:
-            self.send(f"remove {mac_address}", 3)
+            self.process.send(f"remove {mac_address}\n")
+            time.sleep(3)
         except Exception as e:
             logger.error(e)
             return False
@@ -156,7 +159,8 @@ class Bluetoothctl:
     def connect(self, mac_address):
         """Try to connect to a device by mac address."""
         try:
-            self.send(f"connect {mac_address}", 2)
+            self.process.send(f"connect {mac_address}\n")
+            time.sleep(2)
         except Exception as e:
             logger.error(e)
             return False
@@ -169,7 +173,8 @@ class Bluetoothctl:
     def disconnect(self, mac_address):
         """Try to disconnect to a device by mac address."""
         try:
-            self.send(f"disconnect {mac_address}", 2)
+            self.process.send(f"disconnect {mac_address}\n")
+            time.sleep(2)
         except Exception as e:
             logger.error(e)
             return False
