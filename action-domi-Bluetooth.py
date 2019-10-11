@@ -34,14 +34,11 @@ def read_configuration_file(configuration_file):
 class Bluetooth:
     def __init__(self):
         self.discoverable_devices = list()
-        self.scan_thread = None
+        self.threadobj_scan = None
+        self.threadobj_connect = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split(':')[0]: synonym.split(':')[1] for synonym in synonym_list}
         self.ctl = bluetoothctl.Bluetoothctl()
-
-    def scan_devices(self):
-        self.scan_thread = threading.Thread(target=self.thread_scan)
-        self.scan_thread.start()
 
     def get_name_list(self, devices):
         names = []
@@ -51,6 +48,12 @@ class Bluetooth:
             else:
                 names.append(device['name'])
         return names
+
+    def get_addr_from_name(self, name):
+        if name in self.synonyms.values():
+            name = [real_name for real_name in self.synonyms if self.synonyms[real_name] == name][0]
+        addr = [device['mac_address'] for device in bluetooth_cls.discoverable_devices if name == device['name']][0]
+        return addr
 
     def thread_scan(self):
         self.ctl.start_scan()
@@ -68,6 +71,15 @@ class Bluetooth:
         else:
             notify("Ich habe kein Gerät gefunden.")
 
+    def thread_connect(self, addr):
+        success = self.ctl.connect(addr)
+        name = [device['name'] for device in bluetooth_cls.ctl.get_available_devices()
+                if device['mac_address'] == addr][0]
+        if success:
+            notify("%s ist nun verbunden." % name)
+        else:
+            notify("%s konnte nicht verbunden werden." % name)
+
 
 def get_slots(data):
     slot_dict = {}
@@ -83,18 +95,12 @@ def get_slots(data):
     return slot_dict
 
 
-def get_addr(name):
-    if name in bluetooth_cls.synonyms.values():
-        name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
-    addr = [device['mac_address'] for device in bluetooth_cls.discoverable_devices if name == device['name']][0]
-    return addr
-
-
 def msg_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
-    bluetooth_cls.scan_devices()
+    bluetooth_cls.threadobj_scan = threading.Thread(target=bluetooth_cls.thread_scan)
+    bluetooth_cls.threadobj_scan.start()
     say(session_id, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
 
 
@@ -116,8 +122,11 @@ def msg_connect(client, userdata, msg):
     slots = get_slots(data)
     session_id = data['sessionId']
 
-    bluetooth_cls.ctl.connect(slots['device_name'])
-    say(session_id, "%s ist jetzt verbunden." % slots['device_name'])
+    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=addr)
+    bluetooth_cls.threadobj_connect.start()
+
+    say(session_id, "%s wird verbunden." % slots['device_name'])
 
 
 def msg_disconnect(client, userdata, msg):
@@ -125,15 +134,15 @@ def msg_disconnect(client, userdata, msg):
     slots = get_slots(data)
     session_id = data['sessionId']
 
-    bluetooth_cls.ctl.disconnect(get_addr(slots['device_name']))
+    bluetooth_cls.ctl.disconnect(bluetooth_cls.get_addr_from_name(slots['device_name']))
     say(session_id, "%s ist jetzt getrennt." % slots['device_name'])
 
 
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['requestId'] == "add_devices":
-        if bluetooth_cls.scan_thread:
-            del bluetooth_cls.scan_thread
+        if bluetooth_cls.threadobj_scan:
+            del bluetooth_cls.threadobj_scan
         names = bluetooth_cls.get_name_list(bluetooth_cls.discoverable_devices)
         if len(names) > 1:
             notify("Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
@@ -146,7 +155,7 @@ def msg_remove(client, userdata, msg):
     slots = get_slots(data)
     session_id = data['sessionId']
 
-    bluetooth_cls.ctl.remove(get_addr(slots['device_name']))
+    bluetooth_cls.ctl.remove(bluetooth_cls.get_addr_from_name(slots['device_name']))
     say(session_id, "%s wurde entfernt." % slots['device_name'])
 
 
