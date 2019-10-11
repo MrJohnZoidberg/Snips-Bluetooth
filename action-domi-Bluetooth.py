@@ -37,6 +37,7 @@ class Bluetooth:
         self.threadobj_scan = None
         self.threadobj_connect = None
         self.threadobj_disconnect = None
+        self.threadobj_remove = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split(':')[0]: synonym.split(':')[1] for synonym in synonym_list}
         self.ctl = bluetoothctl.Bluetoothctl()
@@ -98,6 +99,13 @@ class Bluetooth:
         else:
             notify("%s konnte nicht getrennt werden." % self.addr_name_dict[addr])
 
+    def thread_remove(self, addr):
+        success = self.ctl.remove(addr)
+        if success:
+            notify("%s wurde von den bekannten Geräten entfernt." % self.addr_name_dict[addr])
+        else:
+            notify("%s konnte nicht entfernt werden." % self.addr_name_dict[addr])
+
 
 def get_slots(data):
     slot_dict = {}
@@ -138,9 +146,9 @@ def msg_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
 
-    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
     if bluetooth_cls.threadobj_connect:
         del bluetooth_cls.threadobj_connect
+    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
     bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
     bluetooth_cls.threadobj_connect.start()
     say(data['sessionId'])
@@ -150,9 +158,21 @@ def msg_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
 
-    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
     if bluetooth_cls.threadobj_disconnect:
         del bluetooth_cls.threadobj_disconnect
+    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
+    bluetooth_cls.threadobj_disconnect.start()
+    say(data['sessionId'])
+
+
+def msg_remove(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    slots = get_slots(data)
+
+    if bluetooth_cls.threadobj_disconnect:
+        del bluetooth_cls.threadobj_disconnect
+    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
     bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
     bluetooth_cls.threadobj_disconnect.start()
     say(data['sessionId'])
@@ -168,15 +188,6 @@ def msg_injection_complete(client, userdata, msg):
             notify("Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
         else:
             notify("Ich habe das Gerät %s gefunden." % names[0])
-
-
-def msg_remove(client, userdata, msg):
-    data = json.loads(msg.payload.decode("utf-8"))
-    slots = get_slots(data)
-    session_id = data['sessionId']
-
-    bluetooth_cls.ctl.remove(bluetooth_cls.get_addr_from_name(slots['device_name']))
-    say(session_id, "%s wurde entfernt." % slots['device_name'])
 
 
 def say(session_id, text=None):
