@@ -170,11 +170,11 @@ def msg_remove(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
 
-    if bluetooth_cls.threadobj_disconnect:
-        del bluetooth_cls.threadobj_disconnect
+    if bluetooth_cls.threadobj_remove:
+        del bluetooth_cls.threadobj_remove
     addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
-    bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
-    bluetooth_cls.threadobj_disconnect.start()
+    bluetooth_cls.threadobj_remove = threading.Thread(target=bluetooth_cls.thread_remove, args=(addr,))
+    bluetooth_cls.threadobj_remove.start()
     say(data['sessionId'])
 
 
