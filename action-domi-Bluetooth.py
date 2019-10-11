@@ -33,42 +33,38 @@ def read_configuration_file(configuration_file):
 
 class Bluetooth:
     def __init__(self):
-        self.available_devices = list()
+        self.discoverable_devices = list()
         self.scan_thread = None
         synonym_list = config['global']['device_synonyms'].split(',')
-        self.synonyms = {synonym.split('::')[0]: synonym.split('::')[1] for synonym in synonym_list}
+        self.synonyms = {synonym.split(':')[0]: synonym.split(':')[1] for synonym in synonym_list}
         self.ctl = bluetoothctl.Bluetoothctl()
 
     def scan_devices(self):
         self.scan_thread = threading.Thread(target=self.thread_scan)
         self.scan_thread.start()
 
+    def get_name_list(self, devices):
+        names = []
+        for device in devices:
+            if device['name'] in self.synonyms:
+                names.append(self.synonyms[device['name']])
+            else:
+                names.append(device['name'])
+        return names
+
     def thread_scan(self):
         self.ctl.start_scan()
         for i in range(30):
-            if len(self.ctl.get_available_devices()) > len(self.available_devices):
-                new_devices = [device for device in self.ctl.get_available_devices()
-                               if device not in self.available_devices]
-                names = []
-                for device in new_devices:
-                    if device['name'] in self.synonyms:
-                        names.append(self.synonyms[device['name']])
-                    else:
-                        names.append(device['name'])
-                if len(new_devices) == 1:
-                    notify("Gerät {name} entdeckt.".format(name=names[0]))
-                else:
-                    part = ""
-                    for name in names:
-                        part += name
-                        if name != names[-1]:
-                            part += ", "
-                    notify("Geräte {names} entdeckt.".format(names=part))
-            self.available_devices = self.ctl.get_available_devices()
+            current_scan_devices = self.ctl.get_discoverable_devices()
+            if len(current_scan_devices) > len(self.discoverable_devices):
+                new_devices = [device for device in current_scan_devices if device not in self.discoverable_devices]
+                print("Found new bluetooth device(s): %s" % ", ".join(self.get_name_list(new_devices)))
+            self.discoverable_devices = current_scan_devices
             time.sleep(1)
-        if self.available_devices:
-            device_names = [device['name'] for device in self.available_devices]
-            inject('bluetooth_devices', device_names, "add_devices")
+
+        if self.discoverable_devices:
+            names = self.get_name_list(self.discoverable_devices)
+            inject('bluetooth_devices', names, "add_devices")
         else:
             notify("Ich habe kein Gerät gefunden.")
 
@@ -87,83 +83,88 @@ def get_slots(data):
     return slot_dict
 
 
-def on_message_scan(client, userdata, msg):
+def get_addr(name):
+    if name in bluetooth_cls.synonyms.values():
+        name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
+    addr = [device['mac_address'] for device in bluetooth_cls.discoverable_devices if name == device['name']][0]
+    return addr
+
+
+def msg_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
     bluetooth_cls.scan_devices()
-    say(session_id, "Die Bluetooth Suche wurde gestartet.")
+    say(session_id, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
 
 
-def on_message_devices_say(client, userdata, msg):
+def msg_known(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     session_id = data['sessionId']
 
-    devices = bluetooth_cls.available_devices
-
-    part = ""
-    for device in devices:
-        if device['name'] in bluetooth_cls.synonyms:
-            part += bluetooth_cls.synonyms[device['name']]
-        else:
-            part += device['name']
-        if device != devices[-1]:
-            part += ", "
-
-    if len(devices) > 1:
-        say(session_id, "Die Geräte {devices} .".format(devices=part))
-    elif len(devices) == 1:
-        say(session_id, "Das Gerät {devices} .".format(devices=part))
+    names = bluetooth_cls.get_name_list(bluetooth_cls.ctl.get_available_devices())
+    if len(names) > 1:
+        say(session_id, "Ich kenne die Geräte %s ." % ", ".join(names))
+    elif len(names) == 1:
+        say(session_id, "Ich kenne das Gerät %s ." % names[0])
     else:
-        say(session_id, "Kein Gerät.")
+        say(session_id, "Ich kenne noch kein Gerät.")
 
 
-def on_message_device_connect(client, userdata, msg):
+def msg_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
     session_id = data['sessionId']
 
-    name = slots['device_name']
-    if name in bluetooth_cls.synonyms.values():
-        name = [real_name for real_name in bluetooth_cls.synonyms if name == bluetooth_cls.synonyms[real_name]][0]
-    addr = [device['mac_address'] for device in bluetooth_cls.available_devices if name == device['name']][0]
-    bluetooth_cls.ctl.connect(addr)
-    say(session_id, "Verbunden mit {name} .".format(name=slots['device_name']))
+    bluetooth_cls.ctl.connect(slots['device_name'])
+    say(session_id, "%s ist jetzt verbunden." % slots['device_name'])
 
 
-def on_message_device_disconnect(client, userdata, msg):
-    pass
-
-
-def on_message_injection_complete(client, userdata, msg):
+def msg_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
+    slots = get_slots(data)
+    session_id = data['sessionId']
 
+    bluetooth_cls.ctl.disconnect(get_addr(slots['device_name']))
+    say(session_id, "%s ist jetzt getrennt." % slots['device_name'])
+
+
+def msg_injection_complete(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
     if data['requestId'] == "add_devices":
         if bluetooth_cls.scan_thread:
             del bluetooth_cls.scan_thread
-        if len(bluetooth_cls.available_devices) > 1:
-            notify("Ich habe {num} Geräte gefunden.".format(num=len(bluetooth_cls.available_devices)))
+        names = bluetooth_cls.get_name_list(bluetooth_cls.discoverable_devices)
+        if len(names) > 1:
+            notify("Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
         else:
-            notify("Ich habe ein Gerät gefunden.")
+            notify("Ich habe das Gerät %s gefunden." % names[0])
+
+
+def msg_remove(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    slots = get_slots(data)
+    session_id = data['sessionId']
+
+    bluetooth_cls.ctl.remove(get_addr(slots['device_name']))
+    say(session_id, "%s wurde entfernt." % slots['device_name'])
 
 
 def say(session_id, text):
-    mqtt_client.publish('hermes/dialogueManager/endSession', json.dumps({'text': text,
-                                                                         'sessionId': session_id}))
-
-
-def end_session(session_id):
-    mqtt_client.publish('hermes/dialogueManager/endSession', json.dumps({'sessionId': session_id}))
+    if text:
+        data = {'text': text, 'sessionId': session_id}
+    else:
+        data = {'sessionId': session_id}
+    mqtt_client.publish('hermes/dialogueManager/endSession', json.dumps(data))
 
 
 def notify(text):
-    mqtt_client.publish('hermes/dialogueManager/startSession', json.dumps({'init': {'type': 'notification',
-                                                                                    'text': text}}))
+    data = {'type': 'notification', 'text': text}
+    mqtt_client.publish('hermes/dialogueManager/startSession', json.dumps({'init': data}))
 
 
 def inject(entity_name, values, request_id, operation_kind='addFromVanilla'):
-    operation_data = {entity_name: values}
-    operation = (operation_kind, operation_data)
+    operation = (operation_kind, {entity_name: values})
     mqtt_client.publish('hermes/injection/perform', json.dumps({'id': request_id, 'operations': [operation]}))
 
 
@@ -186,22 +187,22 @@ if __name__ == "__main__":
         MQTT_PASSWORD = snips_config['snips-common']['mqtt_password']
 
     config = read_configuration_file('config.ini')
-    default_config = read_configuration_file('config.ini.default')
 
     bluetooth_cls = Bluetooth()
+
     mqtt_client = mqtt.Client()
-    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), on_message_scan)
-    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesSay'), on_message_devices_say)
-    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'),
-                                     on_message_device_connect)
-    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'),
-                                     on_message_device_disconnect)
-    mqtt_client.message_callback_add('hermes/injection/complete', on_message_injection_complete)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), msg_scan)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesKnown'), msg_known)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_connect)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_disconnect)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnectRemove'), msg_remove)
+    mqtt_client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
-    mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesSay'))
+    mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesKnown'))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceConnect'))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'))
+    mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     mqtt_client.subscribe('hermes/injection/complete')
     mqtt_client.loop_forever()

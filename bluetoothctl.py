@@ -4,7 +4,6 @@
 
 import time
 import pexpect
-# import subprocess
 import logging
 
 
@@ -15,7 +14,6 @@ class Bluetoothctl:
     """A wrapper for bluetoothctl utility."""
 
     def __init__(self):
-        # subprocess.check_output("rfkill unblock bluetooth", shell=True)
         self.process = pexpect.spawnu("bluetoothctl", echo=False)
 
     def send(self, command, pause=0):
@@ -66,10 +64,8 @@ class Bluetoothctl:
         available_devices = []
         try:
             out = self.get_output("devices")
-            print(out)
         except Exception as e:
             logger.error(e)
-            print(e)
         else:
             for line in out:
                 device = self.parse_device_info(line)
