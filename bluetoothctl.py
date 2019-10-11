@@ -169,12 +169,12 @@ class Bluetoothctl:
     def disconnect(self, mac_address):
         """Try to disconnect to a device by mac address."""
         try:
-            self.send(f"disconnect {mac_address}", 5)
+            self.send(f"disconnect {mac_address}", 8)
         except Exception as e:
             logger.error(e)
             return False
         else:
             res = self.process.expect(
-                ["Failed to disconnect", "uccessful", pexpect.EOF]
+                ["Failed to disconnect", "Connected: no", pexpect.EOF]
             )
             return res == 1
