@@ -70,21 +70,25 @@ class Bluetooth:
         return name
 
     def thread_scan(self):
-        self.ctl.start_scan()
-        for i in range(30):
-            current_scan_devices = self.ctl.get_discoverable_devices()
-            if len(current_scan_devices) > len(self.discoverable_devices):
-                new_devices = [device for device in current_scan_devices if device not in self.discoverable_devices]
-                print("Found new bluetooth device(s): %s" % ", ".join(self.get_name_list(new_devices)))
-            self.discoverable_devices = current_scan_devices
-            time.sleep(1)
+        success = self.ctl.start_scan()
+        if success:
+            notify("Ich suche jetzt 30 Sekunden lang nach Geräten.")
+            for i in range(30):
+                current_scan_devices = self.ctl.get_discoverable_devices()
+                if len(current_scan_devices) > len(self.discoverable_devices):
+                    new_devices = [device for device in current_scan_devices if device not in self.discoverable_devices]
+                    print("Found new bluetooth device(s): %s" % ", ".join(self.get_name_list(new_devices)))
+                self.discoverable_devices = current_scan_devices
+                time.sleep(1)
 
-        if self.discoverable_devices:
-            self.addr_name_dict = self.get_addr_name_dict(self.addr_name_dict, self.discoverable_devices)
-            names = self.get_name_list(self.discoverable_devices)
-            inject('bluetooth_devices', names, "add_devices")
+            if self.discoverable_devices:
+                self.addr_name_dict = self.get_addr_name_dict(self.addr_name_dict, self.discoverable_devices)
+                names = self.get_name_list(self.discoverable_devices)
+                inject('bluetooth_devices', names, "add_devices")
+            else:
+                notify("Ich habe kein Gerät gefunden.")
         else:
-            notify("Ich habe kein Gerät gefunden.")
+            notify("Die Suche ist fehlgeschlagen.")
 
     def thread_connect(self, addr):
         success = self.ctl.connect(addr)
@@ -128,7 +132,8 @@ def msg_scan(client, userdata, msg):
 
     bluetooth_cls.threadobj_scan = threading.Thread(target=bluetooth_cls.thread_scan)
     bluetooth_cls.threadobj_scan.start()
-    say(data['sessionId'], "Ich suche jetzt 30 Sekunden lang nach Geräten.")
+    #say(data['sessionId'], "Ich suche jetzt 30 Sekunden lang nach Geräten.")
+    say(data['sessionId'])
 
 
 def msg_known(client, userdata, msg):
