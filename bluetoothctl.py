@@ -29,10 +29,24 @@ class Bluetoothctl:
 
     def start_scan(self):
         """Start bluetooth scanning process."""
+        """
         try:
             self.send("scan on")
         except Exception as e:
             logger.error(e)
+        """
+        """Try to connect to a device by mac address."""
+        try:
+            self.process.send(f"scan on\n")
+            time.sleep(2)
+        except Exception as e:
+            logger.error(e)
+            return False
+        else:
+            res = self.process.expect(
+                ["Discovering: yes", pexpect.EOF, pexpect.TIMEOUT]
+            )
+            return res == 0
 
     def make_discoverable(self):
         """Make device discoverable."""
