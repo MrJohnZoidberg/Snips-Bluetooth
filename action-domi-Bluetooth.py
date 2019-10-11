@@ -106,6 +106,7 @@ class Bluetooth:
             notify("%s wurde von den bekannten Geräten entfernt." % self.addr_name_dict[addr])
         else:
             notify("%s konnte nicht entfernt werden." % self.addr_name_dict[addr])
+        del self.addr_name_dict[addr]
 
 
 def get_slots(data):
