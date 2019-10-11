@@ -62,15 +62,11 @@ class Bluetooth:
     def get_addr_from_name(self, name):
         if name in self.synonyms.values():
             name = [real_name for real_name in self.synonyms if self.synonyms[real_name] == name][0]
-        addr = [device['mac_address'] for device in self.ctl.get_available_devices()
-                if name == device['name']][0]
+        addr = [addr for addr in self.addr_name_dict if name == self.addr_name_dict['name']][0]
         return addr
 
     def get_name_from_addr(self, addr):
-        name = [device['name'] for device in self.ctl.get_available_devices()
-                if device['mac_address'] == addr][0]
-        if name in self.synonyms:
-            name = self.synonyms[name]
+        name = self.addr_name_dict[addr]
         return name
 
     def thread_scan(self):
@@ -121,11 +117,10 @@ def get_slots(data):
 
 def msg_scan(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    session_id = data['sessionId']
 
     bluetooth_cls.threadobj_scan = threading.Thread(target=bluetooth_cls.thread_scan)
     bluetooth_cls.threadobj_scan.start()
-    say(session_id, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
+    say(data['sessionId'], "Ich suche jetzt 30 Sekunden lang nach Geräten.")
 
 
 def msg_known(client, userdata, msg):
