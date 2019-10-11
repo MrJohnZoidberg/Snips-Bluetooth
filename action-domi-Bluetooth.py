@@ -60,8 +60,6 @@ class Bluetooth:
         return addr_dict
 
     def get_addr_from_name(self, name):
-        if name in self.synonyms.values():
-            name = [real_name for real_name in self.synonyms if self.synonyms[real_name] == name][0]
         addr = [addr for addr in self.addr_name_dict if name == self.addr_name_dict[addr]][0]
         return addr
 
