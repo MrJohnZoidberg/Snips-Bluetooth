@@ -81,6 +81,7 @@ class Bluetooth:
 
     def thread_connect(self, addr):
         success = self.ctl.connect(addr)
+        time.sleep(2)
         name = self.get_name_from_addr(addr)
         if success:
             notify("%s ist nun verbunden." % name)
