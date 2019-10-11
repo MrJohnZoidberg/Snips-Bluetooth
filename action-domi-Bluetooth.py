@@ -237,7 +237,7 @@ if __name__ == "__main__":
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesKnown'), msg_known)
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_connect)
     mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_disconnect)
-    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnectRemove'), msg_remove)
+    mqtt_client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_remove)
     mqtt_client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     mqtt_client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesKnown'))
