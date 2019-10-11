@@ -36,9 +36,11 @@ class Bluetooth:
         self.discoverable_devices = list()
         self.threadobj_scan = None
         self.threadobj_connect = None
+        self.threadobj_disconnect = None
         synonym_list = config['global']['device_synonyms'].split(',')
         self.synonyms = {synonym.split(':')[0]: synonym.split(':')[1] for synonym in synonym_list}
         self.ctl = bluetoothctl.Bluetoothctl()
+        self.addr_name_dict = self.get_addr_name_dict(dict(), self.ctl.get_available_devices())
 
     def get_name_list(self, devices):
         names = []
@@ -49,15 +51,23 @@ class Bluetooth:
                 names.append(device['name'])
         return names
 
+    def get_addr_name_dict(self, addr_dict, devices):
+        for device in devices:
+            if device['name'] not in self.synonyms:
+                addr_dict[device['mac_address']] = device['name']
+            else:
+                addr_dict[device['mac_address']] = self.synonyms[device['name']]
+        return addr_dict
+
     def get_addr_from_name(self, name):
         if name in self.synonyms.values():
             name = [real_name for real_name in self.synonyms if self.synonyms[real_name] == name][0]
-        addr = [device['mac_address'] for device in bluetooth_cls.ctl.get_available_devices()
+        addr = [device['mac_address'] for device in self.ctl.get_available_devices()
                 if name == device['name']][0]
         return addr
 
     def get_name_from_addr(self, addr):
-        name = [device['name'] for device in bluetooth_cls.ctl.get_available_devices()
+        name = [device['name'] for device in self.ctl.get_available_devices()
                 if device['mac_address'] == addr][0]
         if name in self.synonyms:
             name = self.synonyms[name]
@@ -74,6 +84,7 @@ class Bluetooth:
             time.sleep(1)
 
         if self.discoverable_devices:
+            self.addr_name_dict = self.get_addr_name_dict(self.addr_name_dict, self.discoverable_devices)
             names = self.get_name_list(self.discoverable_devices)
             inject('bluetooth_devices', names, "add_devices")
         else:
@@ -82,17 +93,16 @@ class Bluetooth:
     def thread_connect(self, addr):
         success = self.ctl.connect(addr)
         if success:
-            notify("Verbunden.")
+            notify("%s wurde verbunden." % self.addr_name_dict[addr])
         else:
-            notify("Nicht verbunden.")
-        """
-        time.sleep(2)
-        name = self.get_name_from_addr(addr)
+            notify("%s konnte nicht verbunden werden." % self.addr_name_dict[addr])
+
+    def thread_disconnect(self, addr):
+        success = self.ctl.disconnect(addr)
         if success:
-            notify("%s ist nun verbunden." % name)
+            notify("%s wurde getrennt." % self.addr_name_dict[addr])
         else:
-            notify("%s konnte nicht verbunden werden." % name)
-        """
+            notify("%s konnte nicht getrennt werden." % self.addr_name_dict[addr])
 
 
 def get_slots(data):
@@ -134,22 +144,25 @@ def msg_known(client, userdata, msg):
 def msg_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
-    session_id = data['sessionId']
 
     addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    if bluetooth_cls.threadobj_connect:
+        del bluetooth_cls.threadobj_connect
     bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
     bluetooth_cls.threadobj_connect.start()
-
-    say(session_id)
+    say(data['sessionId'])
 
 
 def msg_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     slots = get_slots(data)
-    session_id = data['sessionId']
 
-    bluetooth_cls.ctl.disconnect(bluetooth_cls.get_addr_from_name(slots['device_name']))
-    say(session_id, "%s ist jetzt getrennt." % slots['device_name'])
+    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    if bluetooth_cls.threadobj_disconnect:
+        del bluetooth_cls.threadobj_disconnect
+    bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
+    bluetooth_cls.threadobj_disconnect.start()
+    say(data['sessionId'])
 
 
 def msg_injection_complete(client, userdata, msg):
