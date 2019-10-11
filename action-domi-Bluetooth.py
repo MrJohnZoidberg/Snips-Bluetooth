@@ -56,6 +56,13 @@ class Bluetooth:
                 if name == device['name']][0]
         return addr
 
+    def get_name_from_addr(self, addr):
+        name = [device['name'] for device in bluetooth_cls.ctl.get_available_devices()
+                if device['mac_address'] == addr][0]
+        if name in self.synonyms:
+            name = self.synonyms[name]
+        return name
+
     def thread_scan(self):
         self.ctl.start_scan()
         for i in range(30):
@@ -74,8 +81,7 @@ class Bluetooth:
 
     def thread_connect(self, addr):
         success = self.ctl.connect(addr)
-        name = [device['name'] for device in bluetooth_cls.ctl.get_available_devices()
-                if device['mac_address'] == addr][0]
+        name = self.get_name_from_addr(addr)
         if success:
             notify("%s ist nun verbunden." % name)
         else:
@@ -124,7 +130,7 @@ def msg_connect(client, userdata, msg):
     session_id = data['sessionId']
 
     addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
-    bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=addr)
+    bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
     bluetooth_cls.threadobj_connect.start()
 
     say(session_id, "%s wird verbunden." % slots['device_name'])
