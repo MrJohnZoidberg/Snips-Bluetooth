@@ -136,7 +136,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to untrust", "Trusted: no", pexpect.EOF]
+                ["Failed to untrust", "untrust succeeded", pexpect.EOF]
             )
             return res == 1
 
@@ -162,7 +162,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to connect", "Connection successful", pexpect.EOF]
+                ["Failed to connect", "Connection successsful", pexpect.EOF]
             )
             return res == 1
 
@@ -175,6 +175,6 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to disconnect", "Connected: no\r\n", pexpect.EOF]
+                "Connected: no"
             )
             return res == 1
