@@ -174,7 +174,7 @@ class Bluetoothctl:
             logger.error(e)
             return False
         else:
-            res = self.process.expect_list(
+            res = self.process.expect(
                 ["Failed to disconnect", "Connected: no", pexpect.EOF]
             )
             return res == 1
