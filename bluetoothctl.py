@@ -19,8 +19,8 @@ class Bluetoothctl:
     def send(self, command, pause=0):
         self.process.send(f"{command}\n")
         time.sleep(pause)
-        if self.process.expect(["bluetooth", pexpect.EOF]):
-            raise Exception(f"failed after {command}")
+        #if self.process.expect(["bluetooth", pexpect.EOF]):
+        #    raise Exception(f"failed after {command}")
 
     def get_output(self, *args, **kwargs):
         """Run a command in bluetoothctl prompt, return output as a list of lines."""
@@ -162,7 +162,7 @@ class Bluetoothctl:
             return False
         else:
             res = self.process.expect(
-                ["Failed to connect", "Connection successsful", pexpect.EOF]
+                ["Failed to connect", "Connection successful", pexpect.EOF]
             )
             return res == 1
 
