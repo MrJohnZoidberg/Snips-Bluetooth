@@ -61,9 +61,11 @@ class Bluetooth:
         return addr_dict
 
     def get_addr_from_name(self, name):
-        print(self.addr_name_dict)
-        addr = [addr for addr in self.addr_name_dict if name == self.addr_name_dict[addr]][0]
-        return addr
+        addr_list = [addr for addr in self.addr_name_dict if name == self.addr_name_dict[addr]]
+        if addr_list:
+            return None, addr_list[0]
+        else:
+            return "Ich kenne das Gerät nicht.", None
 
     def get_name_from_addr(self, addr):
         name = self.addr_name_dict[addr]
@@ -155,10 +157,13 @@ def msg_connect(client, userdata, msg):
 
     if bluetooth_cls.threadobj_connect:
         del bluetooth_cls.threadobj_connect
-    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
-    bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
-    bluetooth_cls.threadobj_connect.start()
-    say(data['sessionId'])
+    err, addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    if err:
+        say(data['sessionId'], err)
+    else:
+        bluetooth_cls.threadobj_connect = threading.Thread(target=bluetooth_cls.thread_connect, args=(addr,))
+        bluetooth_cls.threadobj_connect.start()
+        say(data['sessionId'])
 
 
 def msg_disconnect(client, userdata, msg):
@@ -167,10 +172,13 @@ def msg_disconnect(client, userdata, msg):
 
     if bluetooth_cls.threadobj_disconnect:
         del bluetooth_cls.threadobj_disconnect
-    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
-    bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
-    bluetooth_cls.threadobj_disconnect.start()
-    say(data['sessionId'])
+    err, addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    if err:
+        say(data['sessionId'], err)
+    else:
+        bluetooth_cls.threadobj_disconnect = threading.Thread(target=bluetooth_cls.thread_disconnect, args=(addr,))
+        bluetooth_cls.threadobj_disconnect.start()
+        say(data['sessionId'])
 
 
 def msg_remove(client, userdata, msg):
@@ -179,10 +187,13 @@ def msg_remove(client, userdata, msg):
 
     if bluetooth_cls.threadobj_remove:
         del bluetooth_cls.threadobj_remove
-    addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
-    bluetooth_cls.threadobj_remove = threading.Thread(target=bluetooth_cls.thread_remove, args=(addr,))
-    bluetooth_cls.threadobj_remove.start()
-    say(data['sessionId'])
+    err, addr = bluetooth_cls.get_addr_from_name(slots['device_name'])
+    if err:
+        say(data['sessionId'], err)
+    else:
+        bluetooth_cls.threadobj_remove = threading.Thread(target=bluetooth_cls.thread_remove, args=(addr,))
+        bluetooth_cls.threadobj_remove.start()
+        say(data['sessionId'])
 
 
 def msg_injection_complete(client, userdata, msg):
