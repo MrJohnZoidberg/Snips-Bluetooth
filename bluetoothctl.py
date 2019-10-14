@@ -29,13 +29,6 @@ class Bluetoothctl:
 
     def start_scan(self):
         """Start bluetooth scanning process."""
-        """
-        try:
-            self.send("scan on")
-        except Exception as e:
-            logger.error(e)
-        """
-        """Try to connect to a device by mac address."""
         try:
             self.process.send(f"scan on\n")
             time.sleep(2)
@@ -179,6 +172,7 @@ class Bluetoothctl:
             logger.error(e)
             return False
         else:
+            self.process.expect()
             res = self.process.expect(
                 ["Failed to connect", "Connection successful", pexpect.EOF, pexpect.TIMEOUT]
             )
