@@ -33,19 +33,20 @@ class Bluetooth:
         self.available_devices = dict()  # dictionary with siteId as key
         self.paired_devices = dict()  # dictionary with siteId as key
 
-    def get_discoverable_devices(self):
-        return [d for d in self.available_devices if d not in self.paired_devices]
+    def get_discoverable_devices(self, site_id):
+        return [d for d in self.available_devices[site_id] if d not in self.paired_devices[site_id]]
 
-    def get_addr_from_name(self, name):
-        addr_list = [d['mac_address'] for d in self.available_devices if d['name'] == self.get_real_device_name(name)]
+    def get_addr_from_name(self, name, site_id):
+        addr_list = [d['mac_address'] for d in self.available_devices[site_id]
+                     if d['name'] == self.get_real_device_name(name)]
         if addr_list:
             return None, addr_list[0]
         else:
             return "Ich kenne das Gerät nicht.", None
 
-    def get_name_from_addr(self, addr):
+    def get_name_from_addr(self, addr, siteid):
         addr_dict = dict()
-        for device in self.available_devices:
+        for device in self.available_devices[siteid]:
             if device['name'] in device_synonyms:
                 addr_dict[device['mac_address']] = device_synonyms[device['name']]
             else:
@@ -138,21 +139,21 @@ def msg_result_discovered(client, userdata, msg):
     client.message_callback_remove('bluetooth/result' + topic_part)
     # TODO: Test whether the self.get_discoverable_devices() works here right now
     if data['discoverable_devices']:
-        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), "add_devices")
+        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), site_id)
     else:
         notify(client, "Ich habe kein Gerät gefunden.")
 
 
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    if data['requestId'] == "add_devices":
-        names = bl.get_name_list(bl.get_discoverable_devices())
-        notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
+    names = bl.get_name_list(bl.get_discoverable_devices(data['requestId']))
+    notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
 
 
 def msg_ask_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    names = bl.get_name_list(bl.get_discoverable_devices())
+    site_id = get_siteid(get_slots(data), data['siteId'])
+    names = bl.get_name_list(bl.get_discoverable_devices(site_id))
     if names:
         answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
     else:
@@ -162,7 +163,8 @@ def msg_ask_discovered(client, userdata, msg):
 
 def msg_ask_paired(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    names = bl.get_name_list(bl.paired_devices)
+    site_id = get_siteid(get_slots(data), data['siteId'])
+    names = bl.get_name_list(bl.paired_devices[site_id])
     if names:
         answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
     else:
@@ -177,7 +179,7 @@ def msg_ask_connect(client, userdata, msg):
     topic_part = f'/{site_id}/deviceConnect'
     client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
     client.subscribe('bluetooth/result' + topic_part)
-    err, addr = bl.get_addr_from_name(get_slots(data)['device_name'])
+    err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     client.publish('bluetooth/ask' + topic_part, {'addr': addr})
 
@@ -188,7 +190,7 @@ def msg_result_connect(client, userdata, msg):
     topic_part = f'/{site_id}/deviceConnect'
     client.unsubscribe('bluetooth/result' + topic_part)
     client.message_callback_remove('bluetooth/result' + topic_part)
-    name = bl.get_name_from_addr(data['addr'])
+    name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
         notify(client, "Ich bin jetzt bin dem Gerät %s verbunden." % name)
     else:
