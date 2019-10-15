@@ -46,6 +46,7 @@ class Bluetooth:
 
     def get_name_from_addr(self, addr, siteid):
         addr_dict = dict()
+        print("HEEEEEEEEEEEELLLLLLLLLLLLOOOOOOOOOOOO: ", self.available_devices[siteid])
         for device in self.available_devices[siteid]:
             if device['name'] in device_synonyms:
                 addr_dict[device['mac_address']] = device_synonyms[device['name']]
@@ -181,7 +182,8 @@ def msg_ask_connect(client, userdata, msg):
     client.subscribe('bluetooth/result' + topic_part)
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
-    client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
+    if not err:
+        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
 
 def msg_result_connect(client, userdata, msg):
