@@ -39,7 +39,6 @@ class Bluetooth:
     def get_addr_from_name(self, name, site_id):
         addr_list = [d['mac_address'] for d in self.available_devices[site_id]
                      if d['name'] == self.get_real_device_name(name)]
-        print("HEEEEEEEEEEEELLLLLLLLLLLLOOOOOOOOOOOO: ", self.available_devices[site_id])
         if addr_list:
             return None, addr_list[0]
         else:
@@ -178,11 +177,11 @@ def msg_ask_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
     topic_part = f'/{site_id}/deviceConnect'
-    client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
-    client.subscribe('bluetooth/result' + topic_part)
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
+        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
+        client.subscribe('bluetooth/result' + topic_part)
         client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
 
@@ -259,7 +258,6 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
     client.subscribe('bluetooth/update/deviceLists')
-    client.publish('bluetooth/update/requestDeviceLists')
 
 
 if __name__ == "__main__":
@@ -284,4 +282,5 @@ if __name__ == "__main__":
     mqtt_client.on_connect = on_connect
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
+    mqtt_client.publish('bluetooth/update/requestDeviceLists')
     mqtt_client.loop_forever()
