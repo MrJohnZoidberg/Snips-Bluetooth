@@ -30,8 +30,8 @@ def read_configuration_file(configuration_file):
 
 class Bluetooth:
     def __init__(self):
-        self.available_devices = dict()  # dictionary with siteId as key
-        self.paired_devices = dict()  # dictionary with siteId as key
+        self.available_devices = {pair.split(":")[1]: list() for pair in config['global']['rooms_siteids'].split(",")}
+        self.paired_devices = {pair.split(":")[1]: list() for pair in config['global']['rooms_siteids'].split(",")}
 
     def get_discoverable_devices(self, site_id):
         return [d for d in self.available_devices[site_id] if d not in self.paired_devices[site_id]]
