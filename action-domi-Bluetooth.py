@@ -181,7 +181,7 @@ def msg_ask_connect(client, userdata, msg):
     client.subscribe('bluetooth/result' + topic_part)
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
-    client.publish('bluetooth/ask' + topic_part, {'addr': addr})
+    client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
 
 def msg_result_connect(client, userdata, msg):
