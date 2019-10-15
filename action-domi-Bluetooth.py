@@ -30,32 +30,44 @@ def read_configuration_file(configuration_file):
 
 class Bluetooth:
     def __init__(self):
-        self.discoverable_devices = dict()  # dictionary with siteId as key
+        self.available_devices = dict()  # dictionary with siteId as key
         self.paired_devices = dict()  # dictionary with siteId as key
 
-    def get_name_list(self, devices):
-        names = list()
-        for device in devices:
-            if device['name'] in self.synonyms:
-                names.append(self.synonyms[device['name']])
-            else:
-                names.append(device['name'])
-        return names
-
-    def get_addr_name_dict(self, addr_dict, devices):
-        for device in devices:
-            if device['name'] not in self.synonyms:
-                addr_dict[device['mac_address']] = device['name']
-            else:
-                addr_dict[device['mac_address']] = self.synonyms[device['name']]
-        return addr_dict
+    def get_discoverable_devices(self):
+        return [d for d in self.available_devices if d not in self.paired_devices]
 
     def get_addr_from_name(self, name):
-        addr_list = [addr for addr in self.addr_name_dict if name == self.addr_name_dict[addr]]
+        addr_list = [d['mac_address'] for d in self.available_devices if d['name'] == self.get_real_device_name(name)]
         if addr_list:
             return None, addr_list[0]
         else:
             return "Ich kenne das Gerät nicht.", None
+
+    def get_name_from_addr(self, addr):
+        addr_dict = dict()
+        for device in self.available_devices:
+            if device['name'] in device_synonyms:
+                addr_dict[device['mac_address']] = device_synonyms[device['name']]
+            else:
+                addr_dict[device['mac_address']] = device['name']
+        return addr_dict[addr]
+
+    @staticmethod
+    def get_real_device_name(name):
+        if name in device_synonyms.values():
+            return [device_synonyms[rn] for rn in device_synonyms if device_synonyms[rn] == name][0]
+        else:
+            return name
+
+    @staticmethod
+    def get_name_list(devices):
+        names = list()
+        for device in devices:
+            if device['name'] in device_synonyms:
+                names.append(device_synonyms[device['name']])
+            else:
+                names.append(device['name'])
+        return names
 
 
 def get_slots(data):
@@ -84,6 +96,13 @@ def get_siteid(slot_dict, request_siteid):
     else:
         siteid = request_siteid
     return siteid
+
+
+def msg_device_lists(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    site_id = data['siteId']
+    bl.available_devices[site_id] = data['available_devices']
+    bl.paired_devices[site_id] = data['paired_devices']
 
 
 def msg_ask_discover(client, userdata, msg):
@@ -117,10 +136,9 @@ def msg_result_discovered(client, userdata, msg):
     topic_part = f'/{site_id}/devicesDiscovered'
     client.unsubscribe('bluetooth/result' + topic_part)
     client.message_callback_remove('bluetooth/result' + topic_part)
+    # TODO: Test whether the self.get_discoverable_devices() works here right now
     if data['discoverable_devices']:
-        bl.discoverable_devices[site_id] = data['discoverable_devices']
-        bl.paired_devices[site_id] = data['paired_devices']
-        inject(client, 'bluetooth_devices', bl.get_name_list(bl.discoverable_devices), "add_devices")
+        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), "add_devices")
     else:
         notify(client, "Ich habe kein Gerät gefunden.")
 
@@ -128,13 +146,13 @@ def msg_result_discovered(client, userdata, msg):
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['requestId'] == "add_devices":
-        names = bl.get_name_list(bl.discoverable_devices)
+        names = bl.get_name_list(bl.get_discoverable_devices())
         notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
 
 
 def msg_ask_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    names = bl.get_name_list(bl.discoverable_devices)
+    names = bl.get_name_list(bl.get_discoverable_devices())
     if names:
         answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
     else:
@@ -155,14 +173,13 @@ def msg_ask_paired(client, userdata, msg):
 def msg_ask_connect(client, userdata, msg):
     # TODO: Trust/untrust
     data = json.loads(msg.payload.decode("utf-8"))
-    end_session(client, data['sessionId'])
     site_id = get_siteid(get_slots(data), data['siteId'])
     topic_part = f'/{site_id}/deviceConnect'
     client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
     client.subscribe('bluetooth/result' + topic_part)
-    slots = get_slots(data)
-    payload = {}  # TODO: I was here
-    client.publish('bluetooth/ask' + topic_part)
+    err, addr = bl.get_addr_from_name(get_slots(data)['device_name'])
+    end_session(client, data['sessionId'], err)
+    client.publish('bluetooth/ask' + topic_part, {'addr': addr})
 
 
 def msg_result_connect(client, userdata, msg):
@@ -171,10 +188,11 @@ def msg_result_connect(client, userdata, msg):
     topic_part = f'/{site_id}/deviceConnect'
     client.unsubscribe('bluetooth/result' + topic_part)
     client.message_callback_remove('bluetooth/result' + topic_part)
+    name = bl.get_name_from_addr(data['addr'])
     if data['result']:
-        notify(client, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
+        notify(client, "Ich bin jetzt bin dem Gerät %s verbunden." % name)
     else:
-        notify(client, "Ich konnte leider nicht nach Geräten suchen.")
+        notify(client, "Ich konnte mich nicht mit dem Gerät %s verbinden." % name)
 
 
 def msg_disconnect(client, userdata, msg):
@@ -228,6 +246,7 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_disconnect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_remove)
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
+    client.message_callback_add('bluetooth/update/deviceLists', msg_device_lists)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'))
@@ -235,6 +254,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
+    client.subscribe('bluetooth/update/deviceLists')
 
 
 if __name__ == "__main__":
