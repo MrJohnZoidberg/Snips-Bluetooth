@@ -257,6 +257,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
     client.subscribe('bluetooth/update/deviceLists')
+    client.publish('bluetooth/update/requestDeviceLists')
 
 
 if __name__ == "__main__":
