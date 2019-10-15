@@ -39,15 +39,15 @@ class Bluetooth:
     def get_addr_from_name(self, name, site_id):
         addr_list = [d['mac_address'] for d in self.available_devices[site_id]
                      if d['name'] == self.get_real_device_name(name)]
+        print("HEEEEEEEEEEEELLLLLLLLLLLLOOOOOOOOOOOO: ", self.available_devices[site_id])
         if addr_list:
             return None, addr_list[0]
         else:
             return "Ich kenne das Gerät nicht.", None
 
-    def get_name_from_addr(self, addr, siteid):
+    def get_name_from_addr(self, addr, site_id):
         addr_dict = dict()
-        print("HEEEEEEEEEEEELLLLLLLLLLLLOOOOOOOOOOOO: ", self.available_devices[siteid])
-        for device in self.available_devices[siteid]:
+        for device in self.available_devices[site_id]:
             if device['name'] in device_synonyms:
                 addr_dict[device['mac_address']] = device_synonyms[device['name']]
             else:
