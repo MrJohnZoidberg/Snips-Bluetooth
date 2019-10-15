@@ -1,3 +1,4 @@
 [global]
 device_synonyms=MDR-1000X:Kopfhörer,Kombo_22:Verstärker
+rooms_siteids=Wohnzimmer:default
 [secret]
