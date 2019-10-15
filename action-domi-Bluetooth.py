@@ -110,22 +110,12 @@ def msg_ask_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     end_session(client, data['sessionId'])
     site_id = get_siteid(get_slots(data), data['siteId'])
-    topic_part = f'/{site_id}/devicesDiscover'
-    client.message_callback_add('bluetooth/result' + topic_part, msg_result_discover)
-    client.subscribe('bluetooth/result' + topic_part)
-    client.publish('bluetooth/ask' + topic_part)
+    client.publish(f'bluetooth/ask/{site_id}/devicesDiscover')
 
 
 def msg_result_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['siteId']
-    topic_part = f'/{site_id}/devicesDiscover'
-    client.unsubscribe('bluetooth/result' + topic_part)
-    client.message_callback_remove('bluetooth/result' + topic_part)
     if data['result']:
-        topic_part = f'/{site_id}/devicesDiscovered'
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_discovered)
-        client.subscribe('bluetooth/result' + topic_part)
         notify(client, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
     else:
         notify(client, "Ich konnte leider nicht nach Geräten suchen.")
@@ -134,9 +124,6 @@ def msg_result_discover(client, userdata, msg):
 def msg_result_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
-    topic_part = f'/{site_id}/devicesDiscovered'
-    client.unsubscribe('bluetooth/result' + topic_part)
-    client.message_callback_remove('bluetooth/result' + topic_part)
     # TODO: Test whether the self.get_discoverable_devices() works here right now
     if data['discoverable_devices']:
         inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), site_id)
@@ -176,21 +163,15 @@ def msg_ask_connect(client, userdata, msg):
     # TODO: Trust/untrust
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
-    topic_part = f'/{site_id}/deviceConnect'
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
-        client.subscribe('bluetooth/result' + topic_part)
-        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/ask/{site_id}/deviceConnect', json.dumps({'addr': addr}))
 
 
 def msg_result_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
-    topic_part = f'/{site_id}/deviceConnect'
-    client.unsubscribe('bluetooth/result' + topic_part)
-    client.message_callback_remove('bluetooth/result' + topic_part)
     name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
         notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name)
@@ -201,21 +182,15 @@ def msg_result_connect(client, userdata, msg):
 def msg_ask_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
-    topic_part = f'/{site_id}/deviceDisconnect'
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_disconnect)
-        client.subscribe('bluetooth/result' + topic_part)
-        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/ask/{site_id}/deviceDisconnect', json.dumps({'addr': addr}))
 
 
 def msg_result_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
-    topic_part = f'/{site_id}/deviceDisconnect'
-    client.unsubscribe('bluetooth/result' + topic_part)
-    client.message_callback_remove('bluetooth/result' + topic_part)
     name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
         notify(client, "Das Gerät %s wurde getrennt." % name)
@@ -226,21 +201,15 @@ def msg_result_disconnect(client, userdata, msg):
 def msg_ask_remove(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
-    topic_part = f'/{site_id}/deviceRemove'
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_remove)
-        client.subscribe('bluetooth/result' + topic_part)
-        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/ask/{site_id}/deviceRemove', json.dumps({'addr': addr}))
 
 
 def msg_result_remove(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
-    topic_part = f'/{site_id}/deviceRemove'
-    client.unsubscribe('bluetooth/result' + topic_part)
-    client.message_callback_remove('bluetooth/result' + topic_part)
     name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
         notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name)
@@ -284,6 +253,16 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_ask_remove)
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     client.message_callback_add('bluetooth/update/deviceLists', msg_device_lists)
+    client.message_callback_add('bluetooth/result/devicesDiscover', msg_result_discover)
+    client.message_callback_add('bluetooth/result/devicesDiscovered', msg_result_discovered)
+    client.message_callback_add('bluetooth/result/deviceConnect', msg_result_connect)
+    client.message_callback_add('bluetooth/result/deviceDisconnect', msg_result_disconnect)
+    client.message_callback_add('bluetooth/result/deviceRemove', msg_result_remove)
+    client.subscribe('bluetooth/result/devicesDiscover')
+    client.subscribe('bluetooth/result/devicesDiscovered')
+    client.subscribe('bluetooth/result/deviceConnect')
+    client.subscribe('bluetooth/result/deviceDisconnect')
+    client.subscribe('bluetooth/result/deviceRemove')
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'))
