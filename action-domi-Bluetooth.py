@@ -205,7 +205,7 @@ def msg_ask_disconnect(client, userdata, msg):
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
+        client.message_callback_add('bluetooth/result' + topic_part, msg_result_disconnect)
         client.subscribe('bluetooth/result' + topic_part)
         client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
@@ -230,7 +230,7 @@ def msg_ask_remove(client, userdata, msg):
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
+        client.message_callback_add('bluetooth/result' + topic_part, msg_result_remove)
         client.subscribe('bluetooth/result' + topic_part)
         client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
