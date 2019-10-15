@@ -56,6 +56,7 @@ class Bluetooth:
 
     @staticmethod
     def get_real_device_name(name):
+        print([device_synonyms[rn] for rn in device_synonyms])
         if name in device_synonyms.values():
             return [device_synonyms[rn] for rn in device_synonyms if device_synonyms[rn] == name][0]
         else:
