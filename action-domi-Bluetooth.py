@@ -193,25 +193,59 @@ def msg_result_connect(client, userdata, msg):
     client.message_callback_remove('bluetooth/result' + topic_part)
     name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
-        notify(client, "Ich bin jetzt bin dem Gerät %s verbunden." % name)
+        notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name)
     else:
         notify(client, "Ich konnte mich nicht mit dem Gerät %s verbinden." % name)
 
 
-def msg_disconnect(client, userdata, msg):
+def msg_ask_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    slots = get_slots(data)
-
-    err, addr = bl.get_addr_from_name(slots['device_name'])
+    site_id = get_siteid(get_slots(data), data['siteId'])
+    topic_part = f'/{site_id}/deviceDisconnect'
+    err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
+    if not err:
+        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
+        client.subscribe('bluetooth/result' + topic_part)
+        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
 
 
-def msg_remove(client, userdata, msg):
+def msg_result_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    slots = get_slots(data)
+    site_id = data['siteId']
+    topic_part = f'/{site_id}/deviceDisconnect'
+    client.unsubscribe('bluetooth/result' + topic_part)
+    client.message_callback_remove('bluetooth/result' + topic_part)
+    name = bl.get_name_from_addr(data['addr'], site_id)
+    if data['result']:
+        notify(client, "Das Gerät %s wurde getrennt." % name)
+    else:
+        notify(client, "Ich konnte das Gerät %s nicht trennen." % name)
 
-    err, addr = bl.get_addr_from_name(slots['device_name'])
+
+def msg_ask_remove(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    site_id = get_siteid(get_slots(data), data['siteId'])
+    topic_part = f'/{site_id}/deviceRemove'
+    err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
+    if not err:
+        client.message_callback_add('bluetooth/result' + topic_part, msg_result_connect)
+        client.subscribe('bluetooth/result' + topic_part)
+        client.publish('bluetooth/ask' + topic_part, json.dumps({'addr': addr}))
+
+
+def msg_result_remove(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    site_id = data['siteId']
+    topic_part = f'/{site_id}/deviceRemove'
+    client.unsubscribe('bluetooth/result' + topic_part)
+    client.message_callback_remove('bluetooth/result' + topic_part)
+    name = bl.get_name_from_addr(data['addr'], site_id)
+    if data['result']:
+        notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name)
+    else:
+        notify(client, "Ich konnte das Gerät %s nicht entfernen." % name)
 
 
 def end_session(client, session_id, text=None):
@@ -227,7 +261,7 @@ def notify(client, text):
     client.publish('hermes/dialogueManager/startSession', json.dumps({'init': data}))
 
 
-def inject(client, entity_name, values, request_id, operation_kind='addFromVanilla'):
+def inject(client, entity_name, values, request_id, operation_kind='add'):
     operation = (operation_kind, {entity_name: values})
     client.publish('hermes/injection/perform', json.dumps({'id': request_id, 'operations': [operation]}))
 
@@ -246,8 +280,8 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesPaired'), msg_ask_paired)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'), msg_ask_discovered)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_ask_connect)
-    client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_disconnect)
-    client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_remove)
+    client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_ask_disconnect)
+    client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_ask_remove)
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     client.message_callback_add('bluetooth/update/deviceLists', msg_device_lists)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
