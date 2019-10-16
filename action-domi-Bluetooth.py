@@ -159,6 +159,17 @@ def msg_ask_paired(client, userdata, msg):
     end_session(client, data['sessionId'], answer)
 
 
+def ask_connected(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    site_id = get_siteid(get_slots(data), data['siteId'])
+    names = bl.get_name_list(bl.connected_devices[site_id])
+    if names:
+        answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
+    else:
+        answer = "Ich bin mit keinem Gerät gekoppelt."
+    end_session(client, data['sessionId'], answer)
+
+
 def msg_ask_connect(client, userdata, msg):
     # TODO: Trust/untrust
     data = json.loads(msg.payload.decode("utf-8"))
@@ -263,11 +274,6 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('bluetooth/result/deviceConnect', msg_result_connect)
     client.message_callback_add('bluetooth/result/deviceDisconnect', msg_result_disconnect)
     client.message_callback_add('bluetooth/result/deviceRemove', msg_result_remove)
-    client.subscribe('bluetooth/result/devicesDiscover')
-    client.subscribe('bluetooth/result/devicesDiscovered')
-    client.subscribe('bluetooth/result/deviceConnect')
-    client.subscribe('bluetooth/result/deviceDisconnect')
-    client.subscribe('bluetooth/result/deviceRemove')
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'))
@@ -276,6 +282,11 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
     client.subscribe('bluetooth/update/deviceLists')
+    client.subscribe('bluetooth/result/devicesDiscover')
+    client.subscribe('bluetooth/result/devicesDiscovered')
+    client.subscribe('bluetooth/result/deviceConnect')
+    client.subscribe('bluetooth/result/deviceDisconnect')
+    client.subscribe('bluetooth/result/deviceRemove')
 
 
 if __name__ == "__main__":
