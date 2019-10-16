@@ -193,9 +193,10 @@ def msg_result_disconnect(client, userdata, msg):
     site_id = data['siteId']
     name = bl.get_name_from_addr(data['addr'], site_id)
     if data['result']:
-        notify(client, "Das Gerät %s wurde getrennt." % name)
+        text = "Das Gerät %s wurde getrennt." % name
     else:
-        notify(client, "Ich konnte das Gerät %s nicht trennen." % name)
+        text = "Ich konnte das Gerät %s nicht trennen." % name
+    notify(client, text, site_id)
 
 
 def msg_ask_remove(client, userdata, msg):
@@ -225,9 +226,13 @@ def end_session(client, session_id, text=None):
     client.publish('hermes/dialogueManager/endSession', json.dumps(data))
 
 
-def notify(client, text):
+def notify(client, text, site_id=None):
     data = {'type': 'notification', 'text': text}
-    client.publish('hermes/dialogueManager/startSession', json.dumps({'init': data}))
+    if site_id:
+        payload = {'siteId': site_id, 'init': data}
+    else:
+        payload = {'init': data}
+    client.publish('hermes/dialogueManager/startSession', json.dumps(payload))
 
 
 def inject(client, entity_name, values, request_id, operation_kind='add'):
