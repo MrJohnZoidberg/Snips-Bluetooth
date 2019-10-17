@@ -183,6 +183,8 @@ def msg_ask_connect(client, userdata, msg):
     end_session(client, data['sessionId'], err)
     if not err:
         client.publish(f'bluetooth/ask/{site_id}/deviceConnect', json.dumps({'addr': addr}))
+    else:
+        mqtt_client.publish('bluetooth/update/requestDeviceLists')
 
 
 def msg_result_connect(client, userdata, msg):
@@ -204,6 +206,8 @@ def msg_ask_disconnect(client, userdata, msg):
     end_session(client, data['sessionId'], err)
     if not err:
         client.publish(f'bluetooth/ask/{site_id}/deviceDisconnect', json.dumps({'addr': addr}))
+    else:
+        mqtt_client.publish('bluetooth/update/requestDeviceLists')
 
 
 def msg_result_disconnect(client, userdata, msg):
@@ -226,6 +230,8 @@ def msg_ask_remove(client, userdata, msg):
     end_session(client, data['sessionId'], err)
     if not err:
         client.publish(f'bluetooth/ask/{site_id}/deviceRemove', json.dumps({'addr': addr}))
+    else:
+        mqtt_client.publish('bluetooth/update/requestDeviceLists')
 
 
 def msg_result_remove(client, userdata, msg):
