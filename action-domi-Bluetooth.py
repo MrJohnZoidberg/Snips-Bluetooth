@@ -46,12 +46,17 @@ class Bluetooth:
 
     def get_name_from_addr(self, addr, site_id):
         addr_dict = dict()
-        for device in self.available_devices[site_id]:
+        devices = self.available_devices[site_id]
+        print(f"Dictionary 'available_devices': {devices}")
+        for device in devices:
             if device['name'] in device_synonyms:
                 addr_dict[device['mac_address']] = device_synonyms[device['name']]
             else:
                 addr_dict[device['mac_address']] = device['name']
-        return addr_dict[addr]
+        if addr in addr_dict:
+            return addr_dict[addr]
+        else:
+            return None
 
     @staticmethod
     def get_real_device_name(name):
@@ -184,6 +189,8 @@ def msg_result_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
     name = bl.get_name_from_addr(data['addr'], site_id)
+    if not name:
+        name = ""
     if data['result']:
         notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name)
     else:
@@ -203,6 +210,8 @@ def msg_result_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
     name = bl.get_name_from_addr(data['addr'], site_id)
+    if not name:
+        name = ""
     if data['result']:
         text = "Das Gerät %s wurde getrennt." % name
     else:
@@ -223,6 +232,8 @@ def msg_result_remove(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
     name = bl.get_name_from_addr(data['addr'], site_id)
+    if not name:
+        name = ""
     if data['result']:
         notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name)
     else:
