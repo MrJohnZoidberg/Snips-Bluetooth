@@ -1,4 +1,5 @@
-vers=1
+[config]
+version=1
+
 [global]
 device_synonyms=MDR-1000X:Kopfhörer,Kombo_22:Verstärker
-[secret]
