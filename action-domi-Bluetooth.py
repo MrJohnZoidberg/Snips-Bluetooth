@@ -93,22 +93,29 @@ def get_slots(data):
     return slot_dict
 
 
-def get_siteid(slot_dict, request_siteid):
+def get_site_info(slot_dict, request_siteid):
+    site_info = {'err': None, 'room_name': None, 'site_id': None}
     if 'room' in slot_dict:
         if request_siteid in bl.site_info and slot_dict['room'] == bl.site_info[request_siteid]['room_name'] \
                 or slot_dict['room'] == "hier":
-            siteid = request_siteid
-        else:
+            site_info['site_id'] = request_siteid
+        elif request_siteid in bl.site_info and slot_dict['room'] != bl.site_info[request_siteid]['room_name']:
             dict_rooms = {bl.site_info[siteid]['room_name']: siteid for siteid in bl.site_info}
-            siteid = dict_rooms[slot_dict['room']]
+            site_info['site_id'] = dict_rooms[slot_dict['room']]
+        else:
+            site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
     else:
-        siteid = request_siteid
-    return siteid
+        site_info['site_id'] = request_siteid
+    if 'room_name' in bl.site_info[site_info['site_id']]:
+        site_info['room_name'] = bl.site_info[site_info['site_id']]['room_name']
+    else:
+        site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
+    return site_info
 
 
 def msg_device_lists(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['site_id']
+    site_id = data['siteId']
     available_devices = data['available_devices']
     paired_devices = data['paired_devices']
     connected_devices = data['connected_devices']
@@ -123,7 +130,7 @@ def msg_device_lists(client, userdata, msg):
 
 def msg_site_info(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['site_id']
+    site_id = data['siteId']
     if site_id in bl.site_info:
         bl.site_info[site_id]['room_name'] = data['room_name']
     else:
@@ -132,38 +139,41 @@ def msg_site_info(client, userdata, msg):
 
 def msg_ask_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    end_session(client, data['sessionId'])
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    end_session(client, data['sessionId'], site_info['err'])
+    site_id = site_info['site_id']
     client.publish(f'bluetooth/request/oneSite/{site_id}/devicesDiscover')
 
 
 def msg_result_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['result']:
-        notify(client, "Ich suche jetzt 30 Sekunden lang nach Geräten.")
+        notify(client, "Ich suche jetzt 30 Sekunden lang nach Geräten.", data['siteId'])
     else:
-        notify(client, "Ich konnte leider nicht nach Geräten suchen.")
+        notify(client, "Ich konnte leider nicht nach Geräten suchen.", data['siteId'])
 
 
 def msg_result_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['siteId']
-    # TODO: Test whether the self.get_discoverable_devices() works here right now
     if data['discoverable_devices']:
-        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), site_id)
+        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), data['siteId'])
     else:
-        notify(client, "Ich habe kein Gerät gefunden.")
+        notify(client, "Ich habe kein Gerät gefunden.", data['siteId'])
 
 
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     names = bl.get_name_list(bl.get_discoverable_devices(data['requestId']))
-    notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names))
+    notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names), data['siteId'])
 
 
 def msg_ask_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     names = bl.get_name_list(bl.get_discoverable_devices(site_id))
     if names:
         answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
@@ -174,7 +184,11 @@ def msg_ask_discovered(client, userdata, msg):
 
 def msg_ask_paired(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     names = bl.get_name_list(bl.site_info[site_id]['paired_devices'])
     if names:
         answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
@@ -185,7 +199,11 @@ def msg_ask_paired(client, userdata, msg):
 
 def msg_ask_connected(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     names = bl.get_name_list(bl.site_info[site_id]['connected_devices'])
     if names:
         answer = "Ich bin mit folgenden Geräten verbunden: %s" % ", ".join(names)
@@ -196,7 +214,11 @@ def msg_ask_connected(client, userdata, msg):
 
 def msg_ask_connect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
@@ -212,14 +234,18 @@ def msg_result_connect(client, userdata, msg):
     if not name:
         name = ""
     if data['result']:
-        notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name)
+        notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name, site_id)
     else:
-        notify(client, "Ich konnte mich nicht mit dem Gerät %s verbinden." % name)
+        notify(client, "Ich konnte mich nicht mit dem Gerät %s verbinden." % name, site_id)
 
 
 def msg_ask_disconnect(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
@@ -243,7 +269,11 @@ def msg_result_disconnect(client, userdata, msg):
 
 def msg_ask_remove(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = get_siteid(get_slots(data), data['siteId'])
+    site_info = get_site_info(get_slots(data), data['siteId'])
+    if site_info['err']:
+        end_session(client, data['sessionId'], site_info['err'])
+        return
+    site_id = site_info['site_id']
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
@@ -259,9 +289,9 @@ def msg_result_remove(client, userdata, msg):
     if not name:
         name = ""
     if data['result']:
-        notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name)
+        notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name, site_id)
     else:
-        notify(client, "Ich konnte das Gerät %s nicht entfernen." % name)
+        notify(client, "Ich konnte das Gerät %s nicht entfernen." % name, site_id)
 
 
 def end_session(client, session_id, text=None):
@@ -272,7 +302,7 @@ def end_session(client, session_id, text=None):
     client.publish('hermes/dialogueManager/endSession', json.dumps(data))
 
 
-def notify(client, text, site_id=None):
+def notify(client, text, site_id):
     data = {'type': 'notification', 'text': text}
     if site_id:
         payload = {'siteId': site_id, 'init': data}
