@@ -4,7 +4,6 @@
 import paho.mqtt.client as mqtt
 import json
 import toml
-import configparser
 
 
 USERNAME_INTENTS = "domi"
@@ -15,17 +14,6 @@ MQTT_PASSWORD = None
 
 def add_prefix(intent_name):
     return USERNAME_INTENTS + ":" + intent_name
-
-
-def read_configuration_file(configuration_file):
-    try:
-        cp = configparser.ConfigParser()
-        with open(configuration_file, encoding="utf-8") as f:
-            cp.read_file(f)
-        return {section: {option_name: option for option_name, option in cp.items(section)}
-                for section in cp.sections()}
-    except (IOError, configparser.Error):
-        return dict()
 
 
 class Bluetooth:
@@ -40,7 +28,7 @@ class Bluetooth:
     def get_addr_from_name(self, name, site_id):
         print(self.site_info[site_id]['available_devices'])
         addr_list = [d['mac_address'] for d in self.site_info[site_id]['available_devices']
-                     if d['name'] == self.get_real_device_name(name)]
+                     if d['name'] == self.get_real_device_name(name, self.site_info[site_id]['synonyms'])]
         if addr_list:
             return None, addr_list[0]
         else:
@@ -50,8 +38,8 @@ class Bluetooth:
         addr_dict = dict()
         available_devices = self.site_info[site_id]['available_devices']
         for device in available_devices:
-            if device['name'] in device_synonyms:
-                addr_dict[device['mac_address']] = device_synonyms[device['name']]
+            if device['name'] in self.site_info[site_id]['synonyms']:
+                addr_dict[device['mac_address']] = self.site_info[site_id]['synonyms'][device['name']]
             else:
                 addr_dict[device['mac_address']] = device['name']
         if addr in addr_dict:
@@ -60,7 +48,7 @@ class Bluetooth:
             return None
 
     @staticmethod
-    def get_real_device_name(name):
+    def get_real_device_name(name, device_synonyms):
         if name in device_synonyms.values():
             print([rn for rn in device_synonyms if device_synonyms[rn] == name])
             return [rn for rn in device_synonyms if device_synonyms[rn] == name][0]
@@ -68,12 +56,11 @@ class Bluetooth:
             print(name)
             return name
 
-    @staticmethod
-    def get_name_list(devices):
+    def get_name_list(self, devices, site_id):
         names = list()
         for device in devices:
-            if device['name'] in device_synonyms:
-                names.append(device_synonyms[device['name']])
+            if device['name'] in self.site_info[site_id]['synonyms']:
+                names.append(self.site_info[site_id]['synonyms'][device['name']])
             else:
                 names.append(device['name'])
         return names
@@ -133,6 +120,7 @@ def msg_site_info(client, userdata, msg):
     site_id = data['site_id']
     if site_id in bl.site_info:
         bl.site_info[site_id]['room_name'] = data['room_name']
+        bl.site_info[site_id]['synonyms'] = data['synonyms']
     else:
         bl.site_info[site_id] = {'room_name': data['room_name']}
 
@@ -156,14 +144,15 @@ def msg_result_discover(client, userdata, msg):
 def msg_result_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['discoverable_devices']:
-        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices']), data['siteId'])
+        site_id = data['siteId']
+        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices'], site_id), site_id)
     else:
         notify(client, "Ich habe kein Gerät gefunden.", data['siteId'])
 
 
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    names = bl.get_name_list(bl.get_discoverable_devices(data['requestId']))
+    names = bl.get_name_list(bl.get_discoverable_devices(data['requestId']), data['siteId'])
     notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names), data['siteId'])
 
 
@@ -174,7 +163,7 @@ def msg_ask_discovered(client, userdata, msg):
         end_session(client, data['sessionId'], site_info['err'])
         return
     site_id = site_info['site_id']
-    names = bl.get_name_list(bl.get_discoverable_devices(site_id))
+    names = bl.get_name_list(bl.get_discoverable_devices(site_id), site_id)
     if names:
         answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
     else:
@@ -189,7 +178,7 @@ def msg_ask_paired(client, userdata, msg):
         end_session(client, data['sessionId'], site_info['err'])
         return
     site_id = site_info['site_id']
-    names = bl.get_name_list(bl.site_info[site_id]['paired_devices'])
+    names = bl.get_name_list(bl.site_info[site_id]['paired_devices'], site_id)
     if names:
         answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
     else:
@@ -204,7 +193,7 @@ def msg_ask_connected(client, userdata, msg):
         end_session(client, data['sessionId'], site_info['err'])
         return
     site_id = site_info['site_id']
-    names = bl.get_name_list(bl.site_info[site_id]['connected_devices'])
+    names = bl.get_name_list(bl.site_info[site_id]['connected_devices'], site_id)
     if names:
         answer = "Ich bin mit folgenden Geräten verbunden: %s" % ", ".join(names)
     else:
@@ -361,13 +350,6 @@ if __name__ == "__main__":
         MQTT_USERNAME = snips_config['snips-common']['mqtt_username']
     if 'mqtt_password' in snips_config['snips-common'].keys():
         MQTT_PASSWORD = snips_config['snips-common']['mqtt_password']
-
-    config = read_configuration_file('config.ini')
-
-    device_synonyms = list()
-    if 'device_synonyms' in config['global']:
-        device_synonyms = {pair.split(':')[0]: pair.split(':')[1]
-                           for pair in config['global']['device_synonyms'].split(',')}
 
     bl = Bluetooth()
 
