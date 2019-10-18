@@ -94,13 +94,12 @@ def get_slots(data):
 
 
 def get_siteid(slot_dict, request_siteid):
-    dict_siteids = {pair.split(":")[1]: pair.split(":")[0] for pair in config['global']['rooms_siteids'].split(",")}
     if 'room' in slot_dict:
         if request_siteid in bl.site_info and slot_dict['room'] == bl.site_info[request_siteid]['room_name'] \
                 or slot_dict['room'] == "hier":
             siteid = request_siteid
         else:
-            dict_rooms = {dict_siteids[siteid]: siteid for siteid in dict_siteids}
+            dict_rooms = {bl.site_info[siteid]['room_name']: siteid for siteid in bl.site_info}
             siteid = dict_rooms[slot_dict['room']]
     else:
         siteid = request_siteid
