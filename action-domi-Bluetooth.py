@@ -107,7 +107,7 @@ def get_siteid(slot_dict, request_siteid):
 
 def msg_device_lists(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['siteId']
+    site_id = data['site_id']
     available_devices = data['available_devices']
     paired_devices = data['paired_devices']
     connected_devices = data['connected_devices']
