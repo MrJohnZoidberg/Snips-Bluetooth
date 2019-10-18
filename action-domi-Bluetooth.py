@@ -184,7 +184,7 @@ def msg_ask_paired(client, userdata, msg):
     end_session(client, data['sessionId'], answer)
 
 
-def ask_connected(client, userdata, msg):
+def msg_ask_connected(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
     names = bl.get_name_list(bl.site_info[site_id]['connected_devices'])
@@ -299,6 +299,7 @@ def dialogue(client, session_id, text, intent_filter, custom_data=None):
 def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesScan'), msg_ask_discover)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesPaired'), msg_ask_paired)
+    client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesConnected'), msg_ask_connected)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'), msg_ask_discovered)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_ask_connect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_ask_disconnect)
@@ -306,6 +307,7 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
+    client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesConnected'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceConnect'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'))
