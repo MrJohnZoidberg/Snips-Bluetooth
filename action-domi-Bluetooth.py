@@ -130,7 +130,7 @@ def msg_device_lists(client, userdata, msg):
 
 def msg_site_info(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['siteId']
+    site_id = data['site_id']
     if site_id in bl.site_info:
         bl.site_info[site_id]['room_name'] = data['room_name']
     else:
