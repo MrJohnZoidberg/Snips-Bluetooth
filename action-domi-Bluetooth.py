@@ -30,14 +30,16 @@ def read_configuration_file(configuration_file):
 
 class Bluetooth:
     def __init__(self):
-        self.available_devices = {pair.split(":")[1]: list() for pair in config['global']['rooms_siteids'].split(",")}
-        self.paired_devices = {pair.split(":")[1]: list() for pair in config['global']['rooms_siteids'].split(",")}
+        self.site_info = dict()
+        #self.connected_devices =
 
     def get_discoverable_devices(self, site_id):
-        return [d for d in self.available_devices[site_id] if d not in self.paired_devices[site_id]]
+        available_devices = self.site_info[site_id]['available_devices']
+        paired_devices = self.site_info[site_id]['paired_devices']
+        return [d for d in available_devices if d not in paired_devices]
 
     def get_addr_from_name(self, name, site_id):
-        addr_list = [d['mac_address'] for d in self.available_devices[site_id]
+        addr_list = [d['mac_address'] for d in self.site_info[site_id]['available_devices']
                      if d['name'] == self.get_real_device_name(name)]
         if addr_list:
             return None, addr_list[0]
@@ -46,9 +48,8 @@ class Bluetooth:
 
     def get_name_from_addr(self, addr, site_id):
         addr_dict = dict()
-        devices = self.available_devices[site_id]
-        print(f"Dictionary 'available_devices': {devices}")
-        for device in devices:
+        available_devices = self.site_info[site_id]['available_devices']
+        for device in available_devices:
             if device['name'] in device_synonyms:
                 addr_dict[device['mac_address']] = device_synonyms[device['name']]
             else:
@@ -93,7 +94,7 @@ def get_slots(data):
 def get_siteid(slot_dict, request_siteid):
     dict_siteids = {pair.split(":")[1]: pair.split(":")[0] for pair in config['global']['rooms_siteids'].split(",")}
     if 'room' in slot_dict:
-        if request_siteid in dict_siteids and slot_dict['room'] == dict_siteids[request_siteid] \
+        if request_siteid in bl.site_info and slot_dict['room'] == bl.site_info[request_siteid]['room_name'] \
                 or slot_dict['room'] == "hier":
             siteid = request_siteid
         else:
@@ -107,15 +108,32 @@ def get_siteid(slot_dict, request_siteid):
 def msg_device_lists(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = data['siteId']
-    bl.available_devices[site_id] = data['available_devices']
-    bl.paired_devices[site_id] = data['paired_devices']
+    available_devices = data['available_devices']
+    paired_devices = data['paired_devices']
+    connected_devices = data['connected_devices']
+    if site_id in bl.site_info:
+        bl.site_info[site_id]['available_devices'] = available_devices
+        bl.site_info[site_id]['paired_devices'] = paired_devices
+        bl.site_info[site_id]['connected_devices'] = connected_devices
+    else:
+        bl.site_info[site_id] = {'available_devices': available_devices, 'paired_devices': paired_devices,
+                                 'connected_devices': connected_devices}
+
+
+def msg_site_info(client, userdata, msg):
+    data = json.loads(msg.payload.decode("utf-8"))
+    site_id = data['site_id']
+    if site_id in bl.site_info:
+        bl.site_info[site_id]['room_name'] = data['room_name']
+    else:
+        bl.site_info[site_id] = {'room_name': data['room_name']}
 
 
 def msg_ask_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     end_session(client, data['sessionId'])
     site_id = get_siteid(get_slots(data), data['siteId'])
-    client.publish(f'bluetooth/ask/{site_id}/devicesDiscover')
+    client.publish(f'bluetooth/request/oneSite/{site_id}/devicesDiscover')
 
 
 def msg_result_discover(client, userdata, msg):
@@ -156,7 +174,7 @@ def msg_ask_discovered(client, userdata, msg):
 def msg_ask_paired(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
-    names = bl.get_name_list(bl.paired_devices[site_id])
+    names = bl.get_name_list(bl.site_info[site_id]['paired_devices'])
     if names:
         answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
     else:
@@ -167,24 +185,23 @@ def msg_ask_paired(client, userdata, msg):
 def ask_connected(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
-    names = bl.get_name_list(bl.connected_devices[site_id])
+    names = bl.get_name_list(bl.site_info[site_id]['connected_devices'])
     if names:
-        answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
+        answer = "Ich bin mit folgenden Geräten verbunden: %s" % ", ".join(names)
     else:
-        answer = "Ich bin mit keinem Gerät gekoppelt."
+        answer = "Ich bin mit keinem Gerät verbunden."
     end_session(client, data['sessionId'], answer)
 
 
 def msg_ask_connect(client, userdata, msg):
-    # TODO: Trust/untrust
     data = json.loads(msg.payload.decode("utf-8"))
     site_id = get_siteid(get_slots(data), data['siteId'])
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.publish(f'bluetooth/ask/{site_id}/deviceConnect', json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/request/oneSite/{site_id}/deviceConnect', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish('bluetooth/update/requestDeviceLists')
+        mqtt_client.publish(f'bluetooth/request/oneSite/{site_id}/deviceLists')
 
 
 def msg_result_connect(client, userdata, msg):
@@ -205,9 +222,9 @@ def msg_ask_disconnect(client, userdata, msg):
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.publish(f'bluetooth/ask/{site_id}/deviceDisconnect', json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/request/oneSite/{site_id}/deviceDisconnect', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish('bluetooth/update/requestDeviceLists')
+        mqtt_client.publish('bluetooth/request/oneSite/deviceLists')
 
 
 def msg_result_disconnect(client, userdata, msg):
@@ -229,9 +246,9 @@ def msg_ask_remove(client, userdata, msg):
     err, addr = bl.get_addr_from_name(get_slots(data)['device_name'], site_id)
     end_session(client, data['sessionId'], err)
     if not err:
-        client.publish(f'bluetooth/ask/{site_id}/deviceRemove', json.dumps({'addr': addr}))
+        client.publish(f'bluetooth/request/oneSite/{site_id}/deviceRemove', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish('bluetooth/update/requestDeviceLists')
+        mqtt_client.publish('bluetooth/request/oneSite/deviceLists')
 
 
 def msg_result_remove(client, userdata, msg):
@@ -285,12 +302,6 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_ask_disconnect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_ask_remove)
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
-    client.message_callback_add('bluetooth/update/deviceLists', msg_device_lists)
-    client.message_callback_add('bluetooth/result/devicesDiscover', msg_result_discover)
-    client.message_callback_add('bluetooth/result/devicesDiscovered', msg_result_discovered)
-    client.message_callback_add('bluetooth/result/deviceConnect', msg_result_connect)
-    client.message_callback_add('bluetooth/result/deviceDisconnect', msg_result_disconnect)
-    client.message_callback_add('bluetooth/result/deviceRemove', msg_result_remove)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesDiscovered'))
@@ -298,12 +309,15 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
-    client.subscribe('bluetooth/update/deviceLists')
-    client.subscribe('bluetooth/result/devicesDiscover')
-    client.subscribe('bluetooth/result/devicesDiscovered')
-    client.subscribe('bluetooth/result/deviceConnect')
-    client.subscribe('bluetooth/result/deviceDisconnect')
-    client.subscribe('bluetooth/result/deviceRemove')
+
+    client.message_callback_add('bluetooth/answer/deviceLists', msg_device_lists)
+    client.message_callback_add('bluetooth/answer/siteInfo', msg_site_info)
+    client.message_callback_add('bluetooth/answer/devicesDiscover', msg_result_discover)
+    client.message_callback_add('bluetooth/answer/devicesDiscovered', msg_result_discovered)
+    client.message_callback_add('bluetooth/answer/deviceConnect', msg_result_connect)
+    client.message_callback_add('bluetooth/answer/deviceDisconnect', msg_result_disconnect)
+    client.message_callback_add('bluetooth/answer/deviceRemove', msg_result_remove)
+    client.subscribe('bluetooth/answer/#')
 
 
 if __name__ == "__main__":
@@ -328,5 +342,6 @@ if __name__ == "__main__":
     mqtt_client.on_connect = on_connect
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
-    mqtt_client.publish('bluetooth/update/requestDeviceLists')
+    mqtt_client.publish('bluetooth/request/allSites/deviceLists')
+    mqtt_client.publish('bluetooth/request/allSites/siteInfo')
     mqtt_client.loop_forever()
