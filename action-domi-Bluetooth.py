@@ -31,7 +31,6 @@ def read_configuration_file(configuration_file):
 class Bluetooth:
     def __init__(self):
         self.site_info = dict()
-        #self.connected_devices =
 
     def get_discoverable_devices(self, site_id):
         available_devices = self.site_info[site_id]['available_devices']
@@ -39,6 +38,7 @@ class Bluetooth:
         return [d for d in available_devices if d not in paired_devices]
 
     def get_addr_from_name(self, name, site_id):
+        print(self.site_info[site_id]['available_devices'])
         addr_list = [d['mac_address'] for d in self.site_info[site_id]['available_devices']
                      if d['name'] == self.get_real_device_name(name)]
         if addr_list:
@@ -62,8 +62,10 @@ class Bluetooth:
     @staticmethod
     def get_real_device_name(name):
         if name in device_synonyms.values():
+            print([rn for rn in device_synonyms if device_synonyms[rn] == name])
             return [rn for rn in device_synonyms if device_synonyms[rn] == name][0]
         else:
+            print(name)
             return name
 
     @staticmethod
