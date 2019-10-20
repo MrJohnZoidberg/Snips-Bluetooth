@@ -117,12 +117,7 @@ def msg_device_lists(client, userdata, msg):
 
 def msg_site_info(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['site_id']
-    if site_id in bl.site_info:
-        bl.site_info[site_id]['room_name'] = data['room_name']
-        bl.site_info[site_id]['synonyms'] = data['synonyms']
-    else:
-        bl.site_info[site_id] = {'room_name': data['room_name']}
+    bl.site_info[data['site_id']] = data
 
 
 def msg_ask_discover(client, userdata, msg):
@@ -322,6 +317,7 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_ask_connect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_ask_disconnect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_ask_remove)
+    # TODO: Subscribe only if discovering
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
