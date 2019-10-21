@@ -28,7 +28,6 @@ class Bluetooth:
         return [d for d in available_devices if d not in paired_devices]
 
     def get_addr_from_name(self, name, site_id):
-        print(self.site_info[site_id]['available_devices'])
         addr_list = [d['mac_address'] for d in self.site_info[site_id]['available_devices']
                      if d['name'] == self.get_real_device_name(name, self.site_info[site_id]['synonyms'])]
         if addr_list:
