@@ -4,6 +4,7 @@
 import paho.mqtt.client as mqtt
 import json
 import toml
+import uuid
 
 
 USERNAME_INTENTS = "domi"
@@ -19,6 +20,7 @@ def add_prefix(intent_name):
 class Bluetooth:
     def __init__(self):
         self.site_info = dict()
+        self.inject_requestid = dict()
 
     def get_discoverable_devices(self, site_id):
         available_devices = self.site_info[site_id]['available_devices']
@@ -140,15 +142,20 @@ def msg_result_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['discoverable_devices']:
         site_id = data['siteId']
-        inject(client, 'bluetooth_devices', bl.get_name_list(data['discoverable_devices'], site_id), site_id)
+        request_id = uuid.uuid4()
+        bl.inject_requestid[request_id] = site_id
+        inject(client, 'audio_devices', bl.get_name_list(data['discoverable_devices'], site_id), request_id)
     else:
         notify(client, "Ich habe kein Gerät gefunden.", data['siteId'])
 
 
 def msg_injection_complete(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    names = bl.get_name_list(bl.get_discoverable_devices(data['requestId']), data['siteId'])
-    notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names), data['siteId'])
+    request_id = data['requestId']
+    print("HEEEEEEEEEEEEELLLLLLLLLLLLLLOOOOOOOOOOOOOOO", data['siteId'])
+    if request_id in bl.inject_requestid:
+        names = bl.get_name_list(bl.get_discoverable_devices(request_id), data['siteId'])
+        notify(client, "Ich habe folgende Geräte gefunden: %s" % ", ".join(names), data['siteId'])
 
 
 def msg_ask_discovered(client, userdata, msg):
