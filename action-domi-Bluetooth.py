@@ -142,7 +142,7 @@ def msg_result_discovered(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['discoverable_devices']:
         site_id = data['siteId']
-        request_id = uuid.uuid4()
+        request_id = str(uuid.uuid4())
         bl.inject_requestid[request_id] = site_id
         inject(client, 'audio_devices', bl.get_name_list(data['discoverable_devices'], site_id), request_id)
     else:
