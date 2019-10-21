@@ -155,7 +155,7 @@ def msg_injection_complete(client, userdata, msg):
     if request_id in bl.inject_requestids:
         site_id = bl.inject_requestids[request_id]
         del bl.inject_requestids[request_id]
-        names = bl.get_name_list(bl.get_discoverable_devices(request_id), site_id)
+        names = bl.get_name_list(bl.get_discoverable_devices(site_id), site_id)
         notify(client, "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names), site_id)
 
 
