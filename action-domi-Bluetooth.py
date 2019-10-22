@@ -169,7 +169,7 @@ def msg_ask_discovered(client, userdata, msg):
     if names:
         answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
     else:
-        answer = "Ich kein Gerät entdeckt."
+        answer = "Ich habe kein Gerät entdeckt."
     end_session(client, data['sessionId'], answer)
 
 
