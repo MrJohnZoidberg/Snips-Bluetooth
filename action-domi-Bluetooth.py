@@ -132,9 +132,9 @@ def msg_ask_discover(client, userdata, msg):
 def msg_result_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['result']:
-        notify(client, "Ich suche jetzt 30 Sekunden lang nach Geräten.", data['siteId'])
+        notify(client, "Es wird jetzt 30 Sekunden nach neuen Geräten gesucht.", data['siteId'])
     else:
-        notify(client, "Ich konnte leider nicht nach Geräten suchen.", data['siteId'])
+        notify(client, "Die Gerätesuche konnte nicht gestartet werden.", data['siteId'])
 
 
 def msg_result_discovered(client, userdata, msg):
@@ -145,7 +145,7 @@ def msg_result_discovered(client, userdata, msg):
         bl.inject_requestids[request_id] = site_id
         inject(client, 'audio_devices', bl.get_name_list(data['discoverable_devices'], site_id), request_id)
     else:
-        notify(client, "Ich habe kein Gerät entdeckt.", data['siteId'])
+        notify(client, "Es wurde kein Gerät entdeckt.", data['siteId'])
 
 
 def msg_injection_complete(client, userdata, msg):
@@ -155,7 +155,7 @@ def msg_injection_complete(client, userdata, msg):
         site_id = bl.inject_requestids[request_id]
         del bl.inject_requestids[request_id]
         names = bl.get_name_list(bl.get_discoverable_devices(site_id), site_id)
-        notify(client, "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names), site_id)
+        notify(client, "Es wurden folgende Geräte entdeckt: %s" % ", ".join(names), site_id)
 
 
 def msg_ask_discovered(client, userdata, msg):
@@ -167,9 +167,9 @@ def msg_ask_discovered(client, userdata, msg):
     site_id = site_info['site_id']
     names = bl.get_name_list(bl.get_discoverable_devices(site_id), site_id)
     if names:
-        answer = "Ich habe folgende Geräte entdeckt: %s" % ", ".join(names)
+        answer = "Folgende Geräte wurden entdeckt: %s" % ", ".join(names)
     else:
-        answer = "Ich habe kein Gerät entdeckt."
+        answer = "Es wurde kein Gerät entdeckt."
     end_session(client, data['sessionId'], answer)
 
 
@@ -182,9 +182,9 @@ def msg_ask_paired(client, userdata, msg):
     site_id = site_info['site_id']
     names = bl.get_name_list(bl.site_info[site_id]['paired_devices'], site_id)
     if names:
-        answer = "Ich bin mit folgenden Geräten gekoppelt: %s" % ", ".join(names)
+        answer = "Folgende Geräte sind gekoppelt: %s" % ", ".join(names)
     else:
-        answer = "Ich bin mit keinem Gerät gekoppelt."
+        answer = "Es ist kein Gerät gekoppelt."
     end_session(client, data['sessionId'], answer)
 
 
@@ -197,9 +197,9 @@ def msg_ask_connected(client, userdata, msg):
     site_id = site_info['site_id']
     names = bl.get_name_list(bl.site_info[site_id]['connected_devices'], site_id)
     if names:
-        answer = "Ich bin mit folgenden Geräten verbunden: %s" % ", ".join(names)
+        answer = "Folgende Geräte sind verbunden: %s" % ", ".join(names)
     else:
-        answer = "Ich bin mit keinem Gerät verbunden."
+        answer = "Es ist kein Gerät verbunden."
     end_session(client, data['sessionId'], answer)
 
 
@@ -225,9 +225,9 @@ def msg_result_connect(client, userdata, msg):
     if not name:
         name = ""
     if data['result']:
-        notify(client, "Ich bin jetzt mit dem Gerät %s verbunden." % name, site_id)
+        notify(client, "Das Gerät %s ist jetzt verbunden." % name, site_id)
     else:
-        notify(client, "Ich konnte mich nicht mit dem Gerät %s verbinden." % name, site_id)
+        notify(client, "Das Gerät %s konnte nicht verbunden werden." % name, site_id)
 
 
 def msg_ask_disconnect(client, userdata, msg):
@@ -254,7 +254,7 @@ def msg_result_disconnect(client, userdata, msg):
     if data['result']:
         text = "Das Gerät %s wurde getrennt." % name
     else:
-        text = "Ich konnte das Gerät %s nicht trennen." % name
+        text = "Das Gerät %s konnte nicht getrennt werden." % name
     notify(client, text, site_id)
 
 
@@ -282,7 +282,7 @@ def msg_result_remove(client, userdata, msg):
     if data['result']:
         notify(client, "Das Gerät %s wurde aus der Datenbank entfernt." % name, site_id)
     else:
-        notify(client, "Ich konnte das Gerät %s nicht entfernen." % name, site_id)
+        notify(client, "Das Gerät %s konnte nicht aus der Datenbank entfernt werden." % name, site_id)
 
 
 def end_session(client, session_id, text=None):
@@ -324,7 +324,6 @@ def on_connect(client, userdata, flags, rc):
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceConnect'), msg_ask_connect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceDisconnect'), msg_ask_disconnect)
     client.message_callback_add('hermes/intent/' + add_prefix('BluetoothDeviceRemove'), msg_ask_remove)
-    # TODO: Subscribe only if discovering
     client.message_callback_add('hermes/injection/complete', msg_injection_complete)
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesScan'))
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDevicesPaired'))
