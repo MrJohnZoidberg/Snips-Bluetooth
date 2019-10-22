@@ -101,21 +101,6 @@ def get_site_info(slot_dict, request_siteid):
     return site_info
 
 
-def msg_device_lists(client, userdata, msg):
-    data = json.loads(msg.payload.decode("utf-8"))
-    site_id = data['siteId']
-    available_devices = data['available_devices']
-    paired_devices = data['paired_devices']
-    connected_devices = data['connected_devices']
-    if site_id in bl.site_info:
-        bl.site_info[site_id]['available_devices'] = available_devices
-        bl.site_info[site_id]['paired_devices'] = paired_devices
-        bl.site_info[site_id]['connected_devices'] = connected_devices
-    else:
-        bl.site_info[site_id] = {'available_devices': available_devices, 'paired_devices': paired_devices,
-                                 'connected_devices': connected_devices}
-
-
 def msg_site_info(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     bl.site_info[data['site_id']] = data
@@ -215,7 +200,7 @@ def msg_ask_connect(client, userdata, msg):
     if not err:
         client.publish(f'bluetooth/request/oneSite/{site_id}/deviceConnect', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish(f'bluetooth/request/oneSite/{site_id}/deviceLists')
+        mqtt_client.publish(f'bluetooth/request/oneSite/{site_id}/siteInfo')
 
 
 def msg_result_connect(client, userdata, msg):
@@ -242,7 +227,7 @@ def msg_ask_disconnect(client, userdata, msg):
     if not err:
         client.publish(f'bluetooth/request/oneSite/{site_id}/deviceDisconnect', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish('bluetooth/request/oneSite/deviceLists')
+        mqtt_client.publish(f'bluetooth/request/oneSite/{site_id}/siteInfo')
 
 
 def msg_result_disconnect(client, userdata, msg):
@@ -270,7 +255,7 @@ def msg_ask_remove(client, userdata, msg):
     if not err:
         client.publish(f'bluetooth/request/oneSite/{site_id}/deviceRemove', json.dumps({'addr': addr}))
     else:
-        mqtt_client.publish('bluetooth/request/oneSite/deviceLists')
+        mqtt_client.publish(f'bluetooth/request/oneSite/{site_id}/siteInfo')
 
 
 def msg_result_remove(client, userdata, msg):
@@ -334,7 +319,6 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe('hermes/intent/' + add_prefix('BluetoothDeviceRemove'))
     client.subscribe('hermes/injection/complete')
 
-    client.message_callback_add('bluetooth/answer/deviceLists', msg_device_lists)
     client.message_callback_add('bluetooth/answer/siteInfo', msg_site_info)
     client.message_callback_add('bluetooth/answer/devicesDiscover', msg_result_discover)
     client.message_callback_add('bluetooth/answer/devicesDiscovered', msg_result_discovered)
@@ -359,6 +343,5 @@ if __name__ == "__main__":
     mqtt_client.on_connect = on_connect
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.connect(MQTT_BROKER_ADDRESS.split(":")[0], int(MQTT_BROKER_ADDRESS.split(":")[1]))
-    mqtt_client.publish('bluetooth/request/allSites/deviceLists')
     mqtt_client.publish('bluetooth/request/allSites/siteInfo')
     mqtt_client.loop_forever()
