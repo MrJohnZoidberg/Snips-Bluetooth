@@ -117,7 +117,7 @@ def msg_ask_discover(client, userdata, msg):
 def msg_result_discover(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
     if data['result']:
-        notify(client, "Es wird jetzt 30 Sekunden nach neuen Geräten gesucht.", data['siteId'])
+        notify(client, "Es wird 30 Sekunden nach neuen Geräten gesucht.", data['siteId'])
     else:
         notify(client, "Die Gerätesuche konnte nicht gestartet werden.", data['siteId'])
 
