@@ -94,7 +94,7 @@ def get_site_info(slot_dict, request_siteid):
             site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
     else:
         site_info['site_id'] = request_siteid
-    if 'room_name' in bl.site_info[site_info['site_id']]:
+    if site_info['site_id'] in bl.site_info and 'room_name' in bl.site_info[site_info['site_id']]:
         site_info['room_name'] = bl.site_info[site_info['site_id']]['room_name']
     elif 'room' in slot_dict:
         site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
