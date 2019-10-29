@@ -19,49 +19,69 @@ def add_prefix(intent_name):
 
 class Bluetooth:
     def __init__(self):
-        self.site_info = dict()
+        self.sites_info = dict()
         self.inject_requestids = dict()
 
     def get_discoverable_devices(self, site_id):
-        available_devices = self.site_info[site_id]['available_devices']
-        paired_devices = self.site_info[site_id]['paired_devices']
+        available_devices = self.sites_info[site_id]['available_devices']
+        paired_devices = self.sites_info[site_id]['paired_devices']
         return [d for d in available_devices if d not in paired_devices]
 
     def get_addr_from_name(self, name, site_id):
-        addr_list = [d['mac_address'] for d in self.site_info[site_id]['available_devices']
-                     if d['name'] == self.get_real_device_name(name, self.site_info[site_id]['synonyms'])]
+        addr_list = [d['mac_address'] for d in self.sites_info[site_id]['available_devices']
+                     if d['name'] == self.get_real_device_name(name, self.sites_info[site_id]['device_names'])]
         if addr_list:
             return None, addr_list[0]
         else:
             return "Ich kenne das Gerät nicht.", None
 
+    @staticmethod
+    def get_real_device_name(name, device_names):
+        found_real_name = None
+        for real_name in device_names:
+            synonyms = device_names[real_name]
+            if isinstance(synonyms, str) and synonyms == name:
+                found_real_name = real_name
+                break
+            elif isinstance(synonyms, list):
+                for synonym in synonyms:
+                    if synonym == name:
+                        found_real_name = real_name
+                        break
+            if found_real_name:
+                break
+        if found_real_name:
+            return found_real_name
+        else:
+            return name
+
     def get_name_from_addr(self, addr, site_id):
         addr_dict = dict()
-        available_devices = self.site_info[site_id]['available_devices']
+        available_devices = self.sites_info[site_id]['available_devices']
+        device_names = self.sites_info[site_id]['device_names']
         for device in available_devices:
-            if device['name'] in self.site_info[site_id]['synonyms']:
-                addr_dict[device['mac_address']] = self.site_info[site_id]['synonyms'][device['name']]
+            synonyms = device_names.get(device['name'])
+            if synonyms:
+                if isinstance(synonyms, str):
+                    addr_dict[device['mac_address']] = synonyms
+                elif isinstance(synonyms, list):
+                    addr_dict[device['mac_address']] = synonyms[0]
             else:
                 addr_dict[device['mac_address']] = device['name']
-        if addr in addr_dict:
-            return addr_dict[addr]
-        else:
-            return None
-
-    @staticmethod
-    def get_real_device_name(name, device_synonyms):
-        if name in device_synonyms.values():
-            print([rn for rn in device_synonyms if device_synonyms[rn] == name])
-            return [rn for rn in device_synonyms if device_synonyms[rn] == name][0]
-        else:
-            print(name)
-            return name
+        return addr_dict.get(addr)
 
     def get_name_list(self, devices, site_id):
         names = list()
+        device_names = self.sites_info[site_id]['device_names']
         for device in devices:
-            if device['name'] in self.site_info[site_id]['synonyms']:
-                names.append(self.site_info[site_id]['synonyms'][device['name']])
+            synonyms = device_names.get(device['name'])
+            if synonyms:
+                if isinstance(synonyms, str) and synonyms not in names:
+                    names.append(synonyms)
+                elif isinstance(synonyms, list):
+                    for synonym in synonyms:
+                        if synonym not in names:
+                            names.append(synonym)
             else:
                 names.append(device['name'])
         return names
@@ -76,7 +96,6 @@ def get_slots(data):
             elif slot['value']['kind'] == "Custom":
                 slot_dict[slot['slotName']] = slot['value']['value']
     except (KeyError, TypeError, ValueError) as e:
-        print("Error: ", e)
         slot_dict = {}
     return slot_dict
 
@@ -84,18 +103,18 @@ def get_slots(data):
 def get_site_info(slot_dict, request_siteid):
     site_info = {'err': None, 'room_name': None, 'site_id': None}
     if 'room' in slot_dict:
-        if request_siteid in bl.site_info and slot_dict['room'] == bl.site_info[request_siteid]['room_name'] \
+        if request_siteid in bl.sites_info and slot_dict['room'] == bl.sites_info[request_siteid]['room_name'] \
                 or slot_dict['room'] == "hier":
             site_info['site_id'] = request_siteid
-        elif request_siteid in bl.site_info and slot_dict['room'] != bl.site_info[request_siteid]['room_name']:
-            dict_rooms = {bl.site_info[siteid]['room_name']: siteid for siteid in bl.site_info}
+        elif request_siteid in bl.sites_info and slot_dict['room'] != bl.sites_info[request_siteid]['room_name']:
+            dict_rooms = {bl.sites_info[siteid]['room_name']: siteid for siteid in bl.sites_info}
             site_info['site_id'] = dict_rooms[slot_dict['room']]
         else:
             site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
     else:
         site_info['site_id'] = request_siteid
-    if site_info['site_id'] in bl.site_info and 'room_name' in bl.site_info[site_info['site_id']]:
-        site_info['room_name'] = bl.site_info[site_info['site_id']]['room_name']
+    if site_info['site_id'] in bl.sites_info and 'room_name' in bl.sites_info[site_info['site_id']]:
+        site_info['room_name'] = bl.sites_info[site_info['site_id']]['room_name']
     elif 'room' in slot_dict:
         site_info['err'] = f"Der Raum {slot_dict['room']} wurde noch nicht konfiguriert."
     else:
@@ -105,7 +124,7 @@ def get_site_info(slot_dict, request_siteid):
 
 def msg_site_info(client, userdata, msg):
     data = json.loads(msg.payload.decode("utf-8"))
-    bl.site_info[data['site_id']] = data
+    bl.sites_info[data['site_id']] = data
 
 
 def msg_ask_discover(client, userdata, msg):
@@ -167,7 +186,7 @@ def msg_ask_paired(client, userdata, msg):
         end_session(client, data['sessionId'], site_info['err'])
         return
     site_id = site_info['site_id']
-    names = bl.get_name_list(bl.site_info[site_id]['paired_devices'], site_id)
+    names = bl.get_name_list(bl.sites_info[site_id]['paired_devices'], site_id)
     if names:
         answer = "Folgende Geräte sind gekoppelt: %s" % ", ".join(names)
     else:
@@ -182,7 +201,7 @@ def msg_ask_connected(client, userdata, msg):
         end_session(client, data['sessionId'], site_info['err'])
         return
     site_id = site_info['site_id']
-    names = bl.get_name_list(bl.site_info[site_id]['connected_devices'], site_id)
+    names = bl.get_name_list(bl.sites_info[site_id]['connected_devices'], site_id)
     if names:
         answer = "Folgende Geräte sind verbunden: %s" % ", ".join(names)
     else:
