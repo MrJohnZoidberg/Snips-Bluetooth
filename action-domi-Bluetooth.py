@@ -79,9 +79,8 @@ class Bluetooth:
                 if isinstance(synonyms, str) and synonyms not in names:
                     names.append(synonyms)
                 elif isinstance(synonyms, list):
-                    for synonym in synonyms:
-                        if synonym not in names:
-                            names.append(synonym)
+                    if synonyms[0] not in names:
+                        names.append(synonyms[0])
             else:
                 names.append(device['name'])
         return names
